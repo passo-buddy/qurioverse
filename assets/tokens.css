@@ -1,0 +1,135 @@
+/* ============================================================
+   Qurioverse — デザイントークン（全ページ強制・SSOT）
+   正本: nexus explorations 2026-07-12-expression-universe-site-design.md §4
+   原則: 深宇宙/金/乳白 ・ 見出し=明朝 ・ すべての動きは遅い
+   ============================================================ */
+
+:root {
+  /* 色 — 既存銀河・曼荼羅と同一の語彙 */
+  --space-0: #060409;
+  --space-1: #0a0806;
+  --gold: #f2ca6b;
+  --gold-dim: rgba(242, 202, 107, 0.55);
+  --gold-faint: rgba(242, 202, 107, 0.16);
+  --milk: #ece3d0;
+  --muted: #9a8f76;
+  --line: rgba(154, 143, 118, 0.28);
+
+  /* 字 — 見出し=明朝（余白と詩性）/ 本文=ゴシック */
+  --serif: "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+  --sans: -apple-system, "Hiragino Sans", "Noto Sans JP", system-ui, sans-serif;
+
+  /* 動き — すべて遅い（宇宙の時間感覚）。速いアニメ禁止 */
+  --drift: 90s;
+  --pulse: 7s;
+  --fade: 1.6s;
+  --hover: 0.9s;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: radial-gradient(ellipse 120% 90% at 50% 30%, var(--space-1), var(--space-0) 70%);
+  background-color: var(--space-0);
+  color: var(--milk);
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.9;
+  letter-spacing: 0.04em;
+}
+
+h1, h2, h3 {
+  font-family: var(--serif);
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  color: var(--milk);
+}
+
+a { color: var(--gold); text-decoration: none; transition: opacity var(--hover) ease, text-shadow var(--hover) ease; }
+a:hover, a:focus-visible { opacity: 0.85; text-shadow: 0 0 18px var(--gold-dim); }
+
+::selection { background: var(--gold-faint); color: var(--milk); }
+
+/* ---- サブページ共通の器 ---- */
+.page {
+  max-width: 680px;
+  margin: 0 auto;
+  padding: 96px 24px 120px;
+  animation: page-in var(--fade) ease both;
+}
+@keyframes page-in { from { opacity: 0; } to { opacity: 1; } }
+
+.page h1 {
+  font-size: 28px;
+  margin: 0 0 8px;
+}
+.page .en {
+  display: block;
+  font-family: var(--sans);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  color: var(--muted);
+  margin-bottom: 56px;
+  text-transform: uppercase;
+}
+.page p { color: var(--milk); opacity: 0.92; }
+.page .dim { color: var(--muted); font-size: 13.5px; }
+
+/* ---- 「宇宙に戻る」 ---- */
+.back {
+  display: inline-block;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  color: var(--muted);
+  margin-bottom: 40px;
+}
+.back:hover, .back:focus-visible { color: var(--gold); }
+
+/* ---- フッター航法（二重表記 — 迷子を作らない） ---- */
+.navline {
+  margin-top: 96px;
+  padding-top: 28px;
+  border-top: 1px solid var(--line);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 28px;
+}
+.navline a { color: var(--muted); }
+.navline a:hover, .navline a:focus-visible { color: var(--gold); }
+
+/* ---- カード（燃料補給など） ---- */
+.card {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 28px 30px;
+  margin: 26px 0;
+  background: rgba(236, 227, 208, 0.02);
+  transition: border-color var(--hover) ease, box-shadow var(--hover) ease;
+}
+.card:hover { border-color: var(--gold-dim); box-shadow: 0 0 40px rgba(242, 202, 107, 0.06); }
+.card h2 { font-size: 18px; margin: 0 0 4px; }
+.card .en-sub { font-size: 10.5px; letter-spacing: 0.26em; color: var(--muted); text-transform: uppercase; }
+.card p { font-size: 14.5px; margin: 14px 0 0; }
+
+/* 動きを抑えたい観測者には静止した宇宙を（a11y） */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+
+.badge {
+  display: inline-block;
+  font-size: 10.5px;
+  letter-spacing: 0.2em;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 12px;
+  margin-left: 10px;
+  vertical-align: 2px;
+}

@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="ja"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>研究の銀河 — Explorations Galaxy 3D</title>
+<style>
+  :root{--ink:#eaf0fb;--muted:#8f9bc4;--gold:#f2ca6b;--cyan:#7fe3d6;--gold-dim:rgba(242,202,107,.55)}
+  *{box-sizing:border-box} html,body{margin:0;height:100%;overflow:hidden;background:#04050c;
+    font-family:-apple-system,"Hiragino Sans","Noto Sans JP",system-ui,sans-serif;color:var(--ink)}
+  #app{position:fixed;inset:0;opacity:0;transition:opacity 2s ease} #app.ready{opacity:1} canvas{display:block}
+  #vig{position:fixed;inset:0;z-index:3;pointer-events:none;
+    background:radial-gradient(ellipse 135% 100% at 50% 46%,transparent 46%,rgba(1,2,6,.72) 100%)}
+  .hud{position:fixed;left:28px;top:26px;z-index:5;max-width:380px;pointer-events:none}
+  .title{font-family:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;font-size:26px;font-weight:600;
+    letter-spacing:.16em;text-shadow:0 2px 30px rgba(0,0,0,.8)}
+  .title small{display:block;font-family:-apple-system,"Hiragino Sans",system-ui,sans-serif;font-weight:500;
+    color:var(--muted);font-size:10.5px;letter-spacing:.28em;margin-top:8px}
+  .rule{width:180px;height:1px;margin:13px 0 11px;
+    background:linear-gradient(90deg,var(--gold-dim),rgba(127,227,214,.4),transparent)}
+  .stat{color:var(--muted);font-size:12px;line-height:1.75;text-shadow:0 1px 10px rgba(0,0,0,.7)}
+  .stat b{color:var(--ink);font-weight:600}
+  .legend{display:flex;flex-wrap:wrap;gap:8px 13px;margin-top:10px;font-size:11px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .dot{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:0 0 11px 1px currentColor}
+  .controls{position:fixed;left:50%;transform:translateX(-50%);bottom:22px;z-index:6;display:flex;align-items:center;
+    gap:9px;flex-wrap:wrap;justify-content:center;background:rgba(6,8,16,.5);border:1px solid rgba(150,170,220,.15);
+    border-radius:999px;padding:10px 18px;backdrop-filter:blur(20px) saturate(1.5);
+    box-shadow:0 14px 46px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05)}
+  button{background:rgba(255,255,255,.04);color:#d7e0f5;border:1px solid rgba(255,255,255,.13);border-radius:999px;
+    padding:7px 14px;font-size:12.5px;letter-spacing:.05em;cursor:pointer;transition:all .18s ease}
+  button:hover{border-color:var(--gold-dim);color:#ffe8b0;background:rgba(242,202,107,.08);
+    box-shadow:0 0 16px rgba(242,202,107,.22)}
+  button.on{border-color:rgba(242,202,107,.8);color:var(--gold);background:rgba(242,202,107,.10)}
+  input[type=range]{width:190px;accent-color:var(--gold)}
+  #seedt{color:var(--gold);font-size:12px;min-width:76px;text-align:center;letter-spacing:.08em}
+  #tip{position:fixed;z-index:9;pointer-events:none;max-width:340px;background:rgba(6,9,18,.9);
+    border:1px solid rgba(150,170,220,.24);border-radius:13px;padding:12px 15px;font-size:12.5px;line-height:1.62;
+    opacity:0;transition:opacity .14s;backdrop-filter:blur(14px);box-shadow:0 14px 48px rgba(0,0,0,.7)}
+  #tip .t-type{font-size:10px;letter-spacing:.16em;color:var(--cyan)}
+  #tip .t-title{margin-top:5px;font-size:13.5px;font-weight:600;color:var(--ink);line-height:1.5}
+  #tip .t-ppl{margin-top:6px;color:#ffd98a;font-size:11.5px}
+  #tip .t-tags{margin-top:6px;color:var(--muted);font-size:11px}
+  #tip .t-open{margin-top:9px;color:var(--gold);font-size:11px;letter-spacing:.06em;
+    border-top:1px solid rgba(150,170,220,.16);padding-top:7px}
+  .hint{position:fixed;right:16px;bottom:24px;color:#4d597c;font-size:11px;z-index:5;letter-spacing:.03em}
+</style></head>
+<body>
+<div id="app"></div>
+<div id="vig"></div>
+<div class="hud">
+  <div class="title">研究の銀河<small>EXPLORATIONS GALAXY · 探究の渦</small></div>
+  <div class="rule"></div>
+  <div class="stat" id="stat"></div>
+  <div class="legend">
+    <span><i class="dot" style="background:#ff7a3d;color:#ff7a3d"></i>外部取込(恒星)</span>
+    <span><i class="dot" style="background:#ff9ed2;color:#ff9ed2"></i>長編考察(閃光星)</span>
+    <span><i class="dot" style="background:#7ce98c;color:#7ce98c"></i>中編考察(主系列星)</span>
+    <span><i class="dot" style="background:#ffce4f;color:#ffce4f"></i>短信メモ(原始星)</span>
+    <span><i class="dot" style="background:#f2ca6b;color:#f2ca6b"></i>橋</span>
+  </div>
+</div>
+<div id="tip"></div>
+<div class="controls">
+  <button id="play">▶ 時をまわす</button>
+  <input type="range" id="time" min="0" max="1000" value="1000">
+  <span id="seedt">現在</span>
+  <button id="spin" class="on">◎ 自転</button>
+  <button id="bridges" class="on">橋</button>
+  <button id="filaments" class="on">光の糸</button>
+  <button id="labels" class="on">テーマ名</button>
+  <button id="faceon">俯瞰</button>
+  <button id="png">PNG</button>
+</div>
+<div class="hint">ドラッグ=回転 / ホイール=ズーム / 右ドラッグ=移動 / 星にホバー=考察 / クリック=考察を開く</div>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
+
+const G = {"nodes": [{"id": "2026-03-12-purpose-criteria-guideline-chain", "url": "", "date": "2026-03-12", "title": "Purpose-Criteria-Guideline Chain", "summary": "- date: 2026-03-12 - source: shohmaとの議論（判断基準の体系的蓄積から発展） - status: raw", "notes": "", "themes": [], "people": [], "dur": 22.0, "durstr": "22:00", "type": "discovery", "bucket": "その他の探究", "seed": 2726631900, "indeg": 0, "s": [0.059, -0.155, 0.2095]}, {"id": "2026-04-07-context-window-serial-position-heat-map", "url": "", "date": "2026-04-07", "title": "コンテキストウィンドウ熱地図設計 — シリコンに再現される初頭・新近効果", "summary": "今日の Cognitive Workspace 調査で見えた事実：LLM は入力の先頭と末尾は処理しやすいが、中間部が「薄れる」傾向がある。研究者はこれを「LLMの中抜け問題」と呼ぶが、これは人間の記憶におけるシリアル位置効果（初頭効果・新近効果）と構造的に同形だ。", "notes": "", "themes": ["認知科学", "コンテキスト設計"], "people": [], "dur": 12.0, "durstr": "12:00", "type": "question", "bucket": "コンテキスト工学", "seed": 3278404772, "indeg": 2, "s": [-0.1178, -0.748, -0.8366]}, {"id": "2026-04-07-mechanical-verifiability", "url": "", "date": "2026-04-07", "title": "AI駆動開発における機械的検証可能性", "summary": " 2026-04-07 pr-decision-surface-minimization, pr-discoverable-encapsulation に続く第3の原則 vault principle: pr-mechanical-verifiability として登録済み", "notes": "", "themes": [], "people": [], "dur": 32.0, "durstr": "32:00", "type": "discovery", "bucket": "エージェント設計", "seed": 225642116, "indeg": 0, "s": [-0.0104, -0.2792, 0.2007]}, {"id": "2026-04-10-vibe-coding-annealing-schedule", "url": "", "date": "2026-04-10", "title": "焼きなまし欠陥 — Vibe Codingに「冷却スケジュール」がない", "summary": "Vibe codingの脆弱性が人間比2.74倍になっている原因について、業界は「AIが生成するコードの品質が低い」という説明を採用している。しかしこれは誤診だ。問題はコードの温度ではなく、冷却スケジュールの欠如にある。", "notes": "", "themes": ["AI支援開発", "統計熱力学", "コード品質・セキュリティ"], "people": [], "dur": 26.0, "durstr": "26:00", "type": "discovery", "bucket": "ガバナンスと信頼", "seed": 1601667294, "indeg": 0, "s": [0.0963, -0.2601, 0.2432]}, {"id": "2026-04-14-context-as-uncertainty-gradient-not-information-provision", "url": "", "date": "2026-04-14", "title": "コンテキスト設計 ≠ 情報提供 — 「最適不確実性勾配」の設計へ", "summary": "Gartner が「2026年はコンテキストの年」と宣言し、あらゆる知識資産が「コンテキスト製品」として再定義されている。swirlai のレポートは「コンテキストエンジニアリングは計画・サブエージェント・チェックポイント・承認フロー・障害リカバリをまたぐ統合規律へ」と言う。しかしこれらの議論が暗黙に共有する前提を一つ問い直したい: 「良いコンテキストとは、モデルに必要な情報を過不足なく提供することだ」。", "notes": "", "themes": ["Active Inference / 情報理論", "コンテキストエンジニアリング"], "people": [], "dur": 22.0, "durstr": "22:00", "type": "discovery", "bucket": "コンテキスト工学", "seed": 2689040962, "indeg": 1, "s": [-0.9533, 0.502, -0.4301]}, {"id": "2026-04-14-offline-consolidation-missing-architecture-agent-memory", "url": "", "date": "2026-04-14", "title": "オフライン統合フェーズ不在 — 現在のエージェント記憶はすべて「眠らない学習者」", "summary": "今日の文献調査が明らかにした神経科学的事実: 子どもが語彙を習得するのは「覚醒中の encoding」と「NREM 睡眠中の offline consolidation」という二重プロセスの組み合わせによる。睡眠中に海馬の一時バッファからシャープウェーブリプル・スローオシレーション・スピンドルの協調振動によって情報が新皮質の意味記憶へ転送・統合される——ここで重要なのは、統合後の記憶が「翌日の新しい学習のための足場」になることだ。転送前は孤立したエピソード記憶だったものが、既存の意味ネットワークに埋め込まれ、知識が知識を呼べるようになる。", "notes": "", "themes": ["睡眠神経科学", "エージェント記憶設計"], "people": [], "dur": 21.0, "durstr": "21:00", "type": "discovery", "bucket": "記憶と夢見", "seed": 2796490991, "indeg": 1, "s": [0.1073, -0.2011, 0.9589]}, {"id": "2026-04-15-tacit-knowledge-is-exception-rules-59-files-roman-law", "url": "", "date": "2026-04-15", "title": "暗黙知 = 例外規則の集合体 — 59ファイルとローマ法が同じ構造を解いている", "summary": "Meta が 50+ エージェントを使って 4,100+ ファイルから 59 のコンテキストファイルを生成した。圧縮率は約 1/70。しかし重要なのはこれが「要約」ではないという点だ。59 ファイルが文書化したのは「50+ の非自明なパターン」——自明なものは一切含まれていない。", "notes": "", "themes": ["知識管理", "コンテキストエンジニアリング", "組織学習"], "people": [], "dur": 20.0, "durstr": "20:00", "type": "discovery", "bucket": "コンテキスト工学", "seed": 1064937928, "indeg": 3, "s": [-0.9444, 0.465, -0.3673]}, {"id": "2026-04-25-stigmergy-context-architecture-environment-write", "url": "", "date": "2026-04-25", "title": "スティグマジー型コンテキストアーキテクチャ — 「エージェントへコンテキストを渡す」から「エージェントが環境を書き換える」へ", "summary": "Gartnerが「2026年はContextの年」と宣言し、コンテキストエンジニアリングの5フェーズが企業AIの標準として確立されつつある。しかしすべての議論は「どのコンテキストをエージェントに渡すか」を問い続けている。生態学の「スティグマジー」という概念は、根本的に異なる問いを立てる——「エージェントが環境を書き換えることで、次のエージェントに何を読み取らせるか」。", "notes": "", "themes": ["生態学・群知能", "コンテキストエンジニアリング"], "people": [], "dur": 25.0, "durstr": "25:00", "type": "discovery", "bucket": "コンテキスト工学", "seed": 2275013203, "indeg": 3, "s": [-0.9462, 0.4891, -0.3859]}, {"id": "2026-04-26-extended-mind-managed-agents-cognitive-integration", "url": "", "date": "2026-04-26", "title": "道具から「認知の一部」へ — Extended Mindから読むManaged Agentsの本質的転換", "summary": "Andy ClarkとDavid Chalmersが1998年の論文「The Extended Mind」で提唱した主張：人間の認知は頭蓋骨の内側だけで起きているのではない。メモ帳、スマートフォン、地図——これらを「認知の外部化ツール」と呼ぶのは誤りだ。これらはすでに認知システムの一部として機能しており、脳・身体・外部ツールを含むシステム全体が「思考の主体」だ（Parity Principle）。", "notes": "", "themes": ["認知哲学（Extended Mind理論）", "AIエージェントアーキテクチャ"], "people": [], "dur": 29.0, "durstr": "29:00", "type": "discovery", "bucket": "エージェント設計", "seed": 2471928539, "indeg": 0, "s": [0.0249, -0.2458, 0.2297]}, {"id": "2026-04-27-alara-universal-minimum-constraint-design-principle", "url": "", "date": "2026-04-27", "title": "ALARA原則の普遍性 — 「合理的に達成可能な最小限」が教育・AIエージェント・組織ガバナンスを統一する設計哲学", "summary": "今日の研究で、全く独立して見えた3つの問題が同一の設計問題に収束していることに気づいた。", "notes": "", "themes": ["放射線安全工学（ALARA原則）", "システム設計哲学（教育・AIエージェント・組織ガバナンス）"], "people": [], "dur": 20.0, "durstr": "20:00", "type": "discovery", "bucket": "好奇心と学習", "seed": 431246268, "indeg": 0, "s": [0.0888, -0.2175, 0.0547]}, {"id": "2026-04-30-agent-standards-cooperation-equilibrium-social-context-protocol", "url": "", "date": "2026-04-30", "title": "協力均衡プロトコルとしての標準化 — AGENTS.md は技術仕様ではなく「同チーム初期化」宣言だ", "summary": "エージェント標準化の議論は常に「技術的互換性」として語られる。MCP がツール接続を標準化し、A2A がエージェント間通信を標準化し、AGENTS.md がエージェント身元と制約を標準化する——これらは「どうすれば異なる企業のエージェントが連携できるか」という技術問題への回答として設計されている。しかし今日の wonder seed が示すゲーム理論の知見は、この解釈が根本的に浅いことを示唆する。", "notes": "", "themes": ["ゲーム理論・協力均衡", "エージェント標準化・マルチエージェント設計"], "people": [], "dur": 27.0, "durstr": "27:00", "type": "discovery", "bucket": "マルチエージェント組織", "seed": 1787469851, "indeg": 0, "s": [0.0494, -0.1692, 0.3302]}, {"id": "2026-05-02-agent-efference-copy-missing-prediction-channel", "url": "", "date": "2026-05-02", "title": "エージェント遠心性コピーの欠落 — フレームワーク標準化の前に設計されるべき予測チャネル", "summary": "今週、マルチエージェントシステムの歴史において重要な2つの出来事が起きた。Microsoft Agent Framework 1.0 が正式 GA し、Google A2A プロトコル v1.2 が Linux Foundation 傘下の「Agentic AI Foundation」に移管された。150 組織が A2A を本番運用中であり、事実上の標準化が始まっている。", "notes": "", "themes": ["神経科学（運動計画・遠心性コピー）", "マルチエージェントシステム設計"], "people": [], "dur": 34.0, "durstr": "34:00", "type": "discovery", "bucket": "マルチエージェント組織", "seed": 1009819832, "indeg": 1, "s": [0.013, -0.2119, 0.6708]}, {"id": "2026-05-08-dreaming-salience-signal-memory-consolidation", "url": "", "date": "2026-05-08", "title": "顕著性なき夢 — エージェントの「Dreaming」は何を強化するのか", "summary": "Anthropicが「Dreaming」機能をリサーチプレビューとして公開した。過去セッションを自己レビューし、パターンを学習・自己改善するという。この設計は神経科学の「睡眠記憶固定化（memory consolidation during sleep）」と構造的に同型だ——しかし神経科学が長年をかけて発見した最も重要な教訓が、この設計から欠落しているかもしれない。", "notes": "", "themes": ["エージェントアーキテクチャ", "神経科学（記憶固定化）", "教育心理学（好奇心・顕著性）"], "people": [], "dur": 23.0, "durstr": "23:00", "type": "discovery", "bucket": "記憶と夢見", "seed": 491467213, "indeg": 2, "s": [-0.0757, -0.1742, 0.7479]}, {"id": "2026-05-08-multi-agent-cognitive-monoculture-correlated-failure", "url": "", "date": "2026-05-08", "title": "マルチエージェント認知単型化 — 多様に見えるエージェント群の同期故障条件", "summary": "12 日間で中国 4 社が高性能オープンウェイトモデルを相次いでリリースした。同時期に Gartner はマルチエージェントシステムへの問い合わせが Q1 2024〜Q2 2025 で 1,445% 増と報告し、Google A2A v1.0 が 150 組織で本番稼働した。この三つが同時に起きると、表面的には活況な多様性の拡大に見えるが、その内側に奇妙な均質化が進んでいるかもしれない。", "notes": "", "themes": ["マルチエージェント設計", "生態学（単型化・生物多様性）", "認識論（集合的知識の信頼性）"], "people": [], "dur": 30.0, "durstr": "30:00", "type": "discovery", "bucket": "マルチエージェント組織", "seed": 3715610601, "indeg": 2, "s": [-0.1771, 0.1623, 0.2018]}, {"id": "2026-05-09-curiosity-gap-theory-curiogarden-positioning", "url": "", "date": "2026-05-09", "title": "効率の解像度と好奇心の生態系 — AI 媒介時代の curiosity sprouting 設計論", "summary": "1. Engel「効率追求は好奇心の最大の敵」と「AI は学習加速器」は表面的に対立するが、実は異なる効率を指している（カリキュラム効率 vs アクセス／反復効率）。 2. 好奇心は4フェーズのサイクル（ギャップ感知→不知の保持→探索→満足）で動き、AI は (c)(d) を加速する一方、(a)(b) を縮減するリスクを持つ。 3. ギャップサイズと好奇心は逆U字関係（過小=退屈／最適=好奇心／過大=恐怖）。これは Berlyne / Loewenstein / Friston / Kidd-Hayden の研究系譜で確立済。 4. CurioGarden はギャップサイズの動的調整器として設計されている（コード内に痕跡があるが、設計ドキュメントには言語化されていない）。 5. 後付けでこの理論的根拠を design-spec.md に書くことは、プロダクト・マニフェスト／論文化／差別化の", "notes": "", "themes": ["curiosity-research", "AI-mediated-learning", "predictive-processing", "product-philosophy", "education"], "people": [], "dur": 69.0, "durstr": "69:00", "type": "insight", "bucket": "好奇心と学習", "seed": 1482766854, "indeg": 0, "s": [0.0807, -0.2022, 0.1041]}, {"id": "2026-05-10-literacy-revolution-vibe-coding-judgment-education", "url": "", "date": "2026-05-10", "title": "識字率革命の再演 — Vibe Codingが問いかける「制作から判断へ」の教育シフト", "summary": "2026年のニュースに二つの並走する潮流がある: (1) Vibe Codingが非エンジニアに広がる——子供・退職者・創業者が自然言語でアプリを作る、(2) 幼児教育で「記憶より批判的思考・好奇心」へのシフトが鮮明になる。これを偶然の一致として扱うことは、構造的な洞察の機会を逃す。", "notes": "", "themes": ["技術民主化の歴史（グーテンベルク活版印刷）", "教育理論（批判的思考 vs スキル習得）", "Vibe Coding（AI駆動ノーコード開発）"], "people": [], "dur": 31.0, "durstr": "31:00", "type": "discovery", "bucket": "好奇心と学習", "seed": 969151502, "indeg": 0, "s": [0.0851, -0.2109, 0.0777]}, {"id": "2026-05-12-delegation-granularity-gap-approval-resolution-vulnerability", "url": "", "date": "2026-05-12", "title": "委譲の粒度ギャップ — 承認と侵害の解像度差が生む普遍的脆弱性", "summary": "今日の研究資料に、三つの独立した文脈で同一の構造パターンが現れた。", "notes": "", "themes": ["セキュリティエンジニアリング", "教育設計", "AIシステムアーキテクチャ"], "people": [], "dur": 17.0, "durstr": "17:00", "type": "question", "bucket": "ガバナンスと信頼", "seed": 1708914199, "indeg": 1, "s": [-0.1877, -0.5002, -0.1263]}, {"id": "2026-05-13-convergent-platform-design-constraint-discovery", "url": "", "date": "2026-05-13", "title": "「競合する5チームが同一解に収束するとき」— プラットフォーム設計の収束はハードウェア制約の発見である", "summary": "今日の Context Engineering レポートに、見落とされがちだが重要な記述がある。", "notes": "", "themes": ["システム設計", "認識論", "進化生物学"], "people": [], "dur": 25.0, "durstr": "25:00", "type": "discovery", "bucket": "発達と認知", "seed": 2233127866, "indeg": 2, "s": [0.2311, 0.2784, 0.3164]}, {"id": "2026-05-13-tail-risk-blindspot-signal-compression", "url": "", "date": "2026-05-13", "title": "「平均性能の最適化は尾部の盲点を生む」— Signal圧縮が構造的に殺す信号", "summary": "今日の3つの知見を並べると、不穏なパターンが浮かぶ。", "notes": "", "themes": ["リスク設計", "AIシステム評価", "情報理論"], "people": [], "dur": 21.0, "durstr": "21:00", "type": "discovery", "bucket": "ガバナンスと信頼", "seed": 3422389594, "indeg": 0, "s": [0.0963, -0.2601, 0.2432]}, {"id": "2026-05-14-capability-cheap-design-scarce", "url": "", "date": "2026-05-14", "title": "「ケイパビリティが安くなると、ボトルネックは設計能力に移動する」— PwCの格差とKirchgaslerの格差は同一の法則で動く", "summary": "今日の2つの知見を並べると、異なるドメインで同一の経済構造が可視化される。", "notes": "", "themes": ["経済学", "コンテキスト設計", "教育設計"], "people": [], "dur": 23.0, "durstr": "23:00", "type": "discovery", "bucket": "経済と生態系", "seed": 260177853, "indeg": 3, "s": [-0.2459, -0.6012, -0.3454]}, {"id": "2026-05-14-dreaming-agents-curiosity-consolidation-phase", "url": "", "date": "2026-05-14", "title": "「能動的関与の後の統合フェーズ」— 夢見るエージェントと好奇心の深層は同一構造を持つ", "summary": "Anthropic の \"dreaming\" は、エージェントが過去のセッションを事後的に振り返り、パターンを発見して自己を更新する機能だ。これは「実行中に学ぶ」のではなく「終わった後に学ぶ」という設計選択を明示している。", "notes": "", "themes": ["AIエージェント設計", "発達心理学", "学習科学"], "people": [], "dur": 22.0, "durstr": "22:00", "type": "discovery", "bucket": "発達と認知", "seed": 1844901344, "indeg": 2, "s": [0.7369, 0.7676, -0.6061]}, {"id": "2026-05-14-metabolic-maintenance-cognitive-systems", "url": "", "date": "2026-05-14", "title": "「アーキテクチャ的保守から代謝的保守へ」— 自己修復テストとAI-PKMが共に解いているのは同一の問題だ", "summary": "今日の3つのニュースを構造的に並べると、ソフトウェアと知識システムの両方で、同じ問題の同じ解法が独立に登場しているのに気づく。", "notes": "", "themes": ["システム設計", "システム生物学", "認知工学"], "people": [], "dur": 26.0, "durstr": "26:00", "type": "discovery", "bucket": "記憶と夢見", "seed": 2583040998, "indeg": 1, "s": [0.1788, 0.0601, 0.5839]}, {"id": "2026-05-22-kv-cache-compound-interest-mcp-interface-stability", "url": "", "date": "2026-05-22", "title": "インターフェース安定性が計算複利を生む — MCP収束の隠れた経済学", "summary": "コンテキスト工学研究の中に埋もれていた発見: 「ツール定義をイテレーション途中で変更するとKV-cacheが無効化される。動的なツール定義変更は重大な性能クリフ」。これは単なる実装上のメモとして扱われているが、ここには見落とされているマクロな構造がある。", "notes": "", "themes": ["分散システム設計", "行動経済学", "エージェント基盤"], "people": [], "dur": 24.0, "durstr": "24:00", "type": "discovery", "bucket": "経済と生態系", "seed": 2403074051, "indeg": 0, "s": [0.0415, -0.2118, 0.1708]}, {"id": "2026-05-23-ai-output-quality-axis-divergence-law", "url": "", "date": "2026-05-23", "title": "AIアウトプットの評価軸と実際の品質は常にずれる — コード×教育に現れた共通法則", "summary": "今日、まったく異なる2つの領域から「AIアウトプットの品質問題」が同時に報告された。コード領域では「AI生成コードの45%に脆弱性、本番事故43%増」。しかし教育領域では「AIによる個別最適化学習が成功パターンとして定着」。なぜ一方は成功で他方は失敗か？", "notes": "", "themes": ["品質工学", "教育評価論", "測定理論"], "people": [], "dur": 25.0, "durstr": "25:00", "type": "discovery", "bucket": "好奇心と学習", "seed": 1362227084, "indeg": 0, "s": [0.0851, -0.2109, 0.0777]}, {"id": "2026-05-25-braess-paradox-ai-coding-team-topology", "url": "", "date": "2026-05-25", "title": "ブレイスのパラドックスで読むAIコーディング逆説 — 容量追加が組織スループットを悪化させるのはトポロジーの問題", "summary": "McKinseyの数字は奇妙だ。AI導入でPR作成数が98%増加した。コーディング時間は46%削減された。しかし組織全体の開発速度は変わらなかった。同時に、PRレビュー時間が91%増加し、AIが生成したPRのサイズが18〜154%拡大した。", "notes": "", "themes": ["ネットワーク理論", "ソフトウェア組織設計", "AI生産性"], "people": [], "dur": 30.0, "durstr": "30:00", "type": "discovery", "bucket": "マルチエージェント組織", "seed": 1786646298, "indeg": 0, "s": [0.0513, -0.1691, 0.3172]}, {"id": "2026-05-25-dreaming-curiosity-gap-not-distillation-npj-to-ai-design", "url": "", "date": "2026-05-25", "title": "DreamingはDistillationではなく問いを生成すべき — npj RCT が示すAI自己改善の設計原則", "summary": "ClaudeのDreaming機能は「過去セッションを振り返り、自己改善のためのメモリを生成する」と説明される。現在の設計は本質的に「セッションをレビューして重要な情報を蒸留する（distillation）」モードだ。AIは過去の作業を注意深く聞く学習者として振り返る。", "notes": "", "themes": ["認知科学・教育設計", "AIアーキテクチャ", "自己改善システム"], "people": [], "dur": 29.0, "durstr": "29:00", "type": "discovery", "bucket": "自己改善と計器", "seed": 1694943710, "indeg": 2, "s": [0.1825, -0.7641, -0.7149]}, {"id": "2026-05-30-dopamine-anticipation-bypass-vibecoding-security-atrophy", "url": "", "date": "2026-05-30", "title": "予期ドーパミンバイパス — Vibe Coding がセキュリティ神経符号化を溶かす", "summary": "Vibe Codingのセキュリティ問題は「AIが悪いコードを生成する」という技術問題として語られている。しかし今日の神経科学研究と並べると、別の診断が浮かぶ。", "notes": "", "themes": ["認知神経科学（ドーパミン予期回路）", "Vibe Coding セキュリティ"], "people": [], "dur": 28.0, "durstr": "28:00", "type": "discovery", "bucket": "ガバナンスと信頼", "seed": 3331160878, "indeg": 1, "s": [0.093, 0.2117, 0.8397]}, {"id": "2026-05-31-ai-pkm-synthesis-ui-schema-formation-paradox", "url": "", "date": "2026-05-31", "title": "\"Second Brain\" の逆説 — 合成UIはスキーマ形成を代替する", "summary": "AI-native PKM のセールスポイントは「AIが自動で分類・リンク・合成する」ことだ。Obsidian + AI プラグイン、Notion のスマートサマリー、Mem.ai の自動クラスタリング。これらは \"second brain\" として知的生産性を向上させると主張する。PKM市場は2024年 $52億 → 2025年 $77億（CAGR 47%）という数字がそれを支持しているように見える。", "notes": "", "themes": ["PKM/知識管理", "認知神経科学"], "people": [], "dur": 27.0, "durstr": "27:00", "type": "discovery", "bucket": "記憶と夢見", "seed": 3465890463, "indeg": 2, "s": [0.1094, 0.359, 1.0]}, {"id": "2026-06-01-ecological-ai-benchmark-isert-analog", "url": "", "date": "2026-06-01", "title": "生態的AI評価 — ISERT方法論がSWE-Benchに問う「自然環境での性能」", "summary": "Wiley 2026が提案したISERT（統合科学エンゲージメント応答タスク）の核心的主張は「好奇心は自然な学習環境で測定しなければ実態を捉えられない」だ。実験室タスクは「課題への反応能力」を測定するが、実際の好奇心は「文脈・制約・社会環境・偶発性」の中でこそ発現する。ISERT以前の好奇心測定は、子どもを隔離されたタスクに置き、観察可能な反応のみを記録していた——それは好奇心の「解剖学」であって「生態学」ではない。", "notes": "", "themes": ["教育研究方法論（生態的妥当性）", "AIベンチマーク設計", "認知科学"], "people": [], "dur": 16.0, "durstr": "16:00", "type": "question", "bucket": "好奇心と学習", "seed": 1429257812, "indeg": 2, "s": [0.2779, -0.7746, -0.7038]}, {"id": "2026-06-01-failure-memory-access-right-context-learning-org", "url": "", "date": "2026-06-01", "title": "失敗記憶へのアクセス権 — エラートレース保存原理の三層制度設計", "summary": "Context Engineeringの設計原則が今日の調査で明確になった：「エラーメッセージと直近ツール呼び出しをRaw形式で保持しないと、モデルが同一の失敗パスを繰り返す」。圧縮された失敗記憶では「過去の失敗を忘れた」状態で同一試行を再実行する。この原理は驚くほど普遍的に見える。", "notes": "", "themes": ["Context Engineering / エージェント記憶設計", "教育心理学（失敗経験の記憶）", "組織学習"], "people": [], "dur": 13.0, "durstr": "13:00", "type": "question", "bucket": "コンテキスト工学", "seed": 426751730, "indeg": 2, "s": [-0.4956, 0.049, 0.1108]}, {"id": "2026-06-02-context-saturation-cliff-40-50-percent-universal-law", "url": "", "date": "2026-06-02", "title": "コンテキスト崩壊の 40-50% 法則 — LLM・ワーキングメモリ・好奇心回路に共通する「容量飽和の崖」", "summary": "今日の研究が示した事実は単純だが深い：LLMはコンテキストが最大長の40〜50%を超えた瞬間、性能が「崩壊的（catastrophic）」に低下する。漸進的劣化ではなくクリフ型崩壊だ。Qwen2.5-7BではF1スコアが0.55→0.30（45.5%低下）という急降下が全18モデルで例外なく観察された。", "notes": "", "themes": ["認知神経科学（好奇心・ワーキングメモリ）", "LLMアーキテクチャ設計", "認知負荷理論"], "people": [], "dur": 19.0, "durstr": "19:00", "type": "question", "bucket": "発達と認知", "seed": 192998751, "indeg": 2, "s": [0.1541, 0.7102, 0.5109]}, {"id": "2026-06-02-vibe-coding-vulnerability-trust-layer-architecture", "url": "", "date": "2026-06-02", "title": "Vibe Coding 脆弱性 2.74倍の正体 — 能力問題ではなく「検証レイヤーの消失」", "summary": "AI生成コードの脆弱性リスクが人間コードの2.74倍——この数字の解釈として「AIはセキュリティを理解していない」という説明が広まっている。しかし今日の別ニュースと並べると、この解釈に疑義が生じる。", "notes": "", "themes": ["ソフトウェアセキュリティ", "AI支援開発プロセス設計", "認知科学（appraisal理論）"], "people": [], "dur": 21.0, "durstr": "21:00", "type": "discovery", "bucket": "ガバナンスと信頼", "seed": 1803568568, "indeg": 3, "s": [0.3957, -0.6668, -0.6794]}, {"id": "2026-06-05-context-explorativeness-quotient-eqo-ai-design", "url": "", "date": "2026-06-05", "title": "CEQ（Context Explorativeness Quotient）— 子どもの好奇心研究がAIコンテキスト設計を変える", "summary": "AIエージェントのコンテキスト設計において、現在の最適化基準はほぼ2軸に収束している：「関連性（relevantか）」と「簡潔性（economyか）」。ACEフレームワークもCodeify Contextもこの2軸を中心に据える。ドキュメントはクリーンで、矛盾なく、完結しているほど良い、とされる。", "notes": "", "themes": ["教育認知科学（EQO・情報ギャップ理論）", "AIエージェント設計（コンテキスト工学）"], "people": [], "dur": 23.0, "durstr": "23:00", "type": "discovery", "bucket": "好奇心と学習", "seed": 2817631617, "indeg": 2, "s": [0.4596, 0.054, -0.5305]}, {"id": "2026-06-05-repetition-friction-as-structural-knowledge-signal", "url": "", "date": "2026-06-05", "title": "反復摩擦が構造知識を可視化する — 「説明の繰り返し」は未形式化構造の証明", "summary": "Codified Contextの「2回の法則」は、表面上は単純なドキュメント化トリガーだ。「同じことを2回説明したら書け」。しかしこのヒューリスティックには、PKM 2026の「蓄積 vs 合成」論争と交差すると、予想外に深い認識論的含意が隠れている。", "notes": "", "themes": ["知識工学（PKM・組織学習）", "AIエージェント設計（コンテキスト工学）", "認知科学（暗黙知形式化）"], "people": [], "dur": 24.0, "durstr": "24:00", "type": "discovery", "bucket": "発達と認知", "seed": 1061358896, "indeg": 2, "s": [0.5653, -0.2052, -0.8709]}, {"id": "2026-06-08-diffusion-architecture-phenomena-based-learning-non-sequential-convergence", "url": "", "date": "2026-06-08", "title": "順序なき収束 — 拡散アーキテクチャと現象ベース学習に共通する非線形認知構造", "summary": "Mercury 2が採用した拡散型推論アーキテクチャの核心は「トークンを並列生成する」ことだ。従来の自己回帰モデルはトークンを左から右へ順番に生成する——前のトークンが決まらないと次が生成できない。拡散モデルは逆だ：全体の空間で同時に「ノイズから意味を取り出す」プロセスが進み、複数の部分が同時に形を帯びていく。", "notes": "", "themes": ["推論アーキテクチャ（拡散モデル）", "教育設計（カリキュラム・学習理論）"], "people": [], "dur": 27.0, "durstr": "27:00", "type": "discovery", "bucket": "エージェント設計", "seed": 279932658, "indeg": 2, "s": [-0.3952, -0.3569, -0.2039]}, {"id": "2026-06-09-inherent-ai-trust-adult-developers-security-degradation-cognitive-pattern", "url": "", "date": "2026-06-09", "title": "内在型AI信頼は子どもだけじゃない — 反復コード改善パラドックスの発達論的根因", "summary": "子どものAIメンタルモデル研究（IDC '25）は3類型を特定した：Deductive（ルール追従）、Inductive（パターン認識）、Inherent（AI は魔法的知性を持つ）。8〜11歳の子どもは圧倒的に Inherent 型で、「AI が賢いから何でもできる」という前提でAIを使う。介入として最も効果的なのは「AI の失敗を見せる（ARC パズル）」ことで、説明より体験が Inherent → Inductive への移行を促す。", "notes": "", "themes": ["認知発達科学", "ソフトウェアセキュリティ"], "people": [], "dur": 26.0, "durstr": "26:00", "type": "discovery", "bucket": "発達と認知", "seed": 3308497999, "indeg": 1, "s": [0.4152, -0.0956, -0.4036]}, {"id": "2026-06-09-semantic-latent-rag-cola-dlm-planning-before-retrieval", "url": "", "date": "2026-06-09", "title": "意味空間でRAGを再設計する — Cola DLM が示す「文脈はトークンで注入してはならない」", "summary": "Cola DLM の核心的革新は「何を言うか（大局的意味）を先に潜在空間で確定し、どう言うか（局所的語彙）を後で分離して決める」という構造にある。Text VAE → 潜在空間プランニング（DiT） → 条件付きデコーダという3フェーズが、意味の決定と語彙の選択を明示的に切り離す。この分離がスケーリング曲線で AR ベースラインに並ぶ品質を生んだ。", "notes": "", "themes": ["LLMアーキテクチャ", "RAG・コンテキスト設計"], "people": [], "dur": 31.0, "durstr": "31:00", "type": "discovery", "bucket": "コンテキスト工学", "seed": 3550351664, "indeg": 0, "s": [-0.2824, -0.0702, -0.0645]}, {"id": "2026-06-09-velocity-security-ratio-sharpe-ratio-ai-development-metric-inversion", "url": "", "date": "2026-06-09", "title": "開発速度のシャープ比 — AI時代の生産性指標がスループットから比率へ転換する構造", "summary": "AI生成コードの反復改善パラドックス論文が明らかにしたデータが示す比率に注目したい：開発者のコミット速度は 3〜4倍に上昇したが、セキュリティ指摘の発生速度は 10倍 に増加した。絶対数で見ると「3倍生産的」だが、比率で見ると「セキュリティ負債の蓄積速度が生産速度を超過している」。この状況で「コミット数」や「行数」を生産性指標として使い続けることは、リターンを最大化しながらリスクを無視した投資判断と同型の誤りだ。", "notes": "", "themes": ["ソフトウェア品質管理", "制約理論・リスク管理"], "people": [], "dur": 30.0, "durstr": "30:00", "type": "discovery", "bucket": "ガバナンスと信頼", "seed": 3081286970, "indeg": 0, "s": [0.1017, -0.2744, 0.2451]}, {"id": "2026-06-10-context-collapse-curiosity-collapse-ace-cycle-question-quality", "url": "", "date": "2026-06-10", "title": "コンテキスト崩壊と好奇心崩壊は同型問題 — ACEサイクルを「問いの品質維持」に転用する", "summary": "ACE（Agentic Context Engineering）が解決しようとしているのは「コンテキスト崩壊」——AIエージェントが文脈を反復的に書き換えるうちに重要な詳細が消え、判断精度が落ちていく現象だ。解決策として提案されているのが「生成→反省→キュレーション」の自己更新サイクルで、これによりベンチマーク改善+10.6%を達成している。", "notes": "", "themes": ["コンテキストエンジニアリング", "幼児教育・好奇心研究"], "people": [], "dur": 21.0, "durstr": "21:00", "type": "discovery", "bucket": "好奇心と学習", "seed": 210019992, "indeg": 2, "s": [-0.6582, 0.504, -0.3426]}, {"id": "2026-06-10-intent-engineering-gap-ai-tutor-family-learning-specification", "url": "", "date": "2026-06-10", "title": "AI家庭教師のIntent Engineeringギャップ — 親が設計しなければプラットフォームのIntentが子どもを学ばせる", "summary": "Context Engineering成熟度モデルの4段階：Prompt Engineering（個別指示の最適化）→ Context Engineering（情報環境の構造化）→ Intent Engineering（組織目標・トレードオフの符号化）→ Specification Engineering（機械可読な企業ポリシー）。この論文が指摘する「企業AIの失敗」の本質は、75%の企業がIntent/Specification層を欠いたままエージェントを展開しているために、スケール時にエージェントが組織目標から逸脱した行動を取ることだ。", "notes": "", "themes": ["コンテキストエンジニアリング", "教育設計・EdTech"], "people": [], "dur": 31.0, "durstr": "31:00", "type": "discovery", "bucket": "コンテキスト工学", "seed": 1354341396, "indeg": 3, "s": [-1.0, 0.2594, -0.545]}, {"id": "2026-06-10-research-taste-formed-at-age-5-7-early-curiosity-ai-advantage", "url": "", "date": "2026-06-10", "title": "「リサーチテイスト」は5〜7歳で形成される — AIが侵食する最後の人間優位の起源を問い直す", "summary": "Anthropicのデータは、AIが人間に最も追いつきにくい最後の砦として「research taste（何を研究すべきかの判断）」を挙げる。次のステップ選択の正確率が2025年11月の51%から2026年4月の64%へと上昇しており、この能力でも人間との差は縮まり続けている。論文の「novelty bottleneck」テーゼは「ノベルティ生成が人間の最終ボトルネック」と位置づけるが、今まさにそのボトルネック自体が消えつつある。", "notes": "", "themes": ["AI能力研究・比較優位論", "発達心理学・早期教育"], "people": [], "dur": 27.0, "durstr": "27:00", "type": "discovery", "bucket": "発達と認知", "seed": 1127241655, "indeg": 2, "s": [0.7171, 0.9497, -0.4681]}, {"id": "2026-06-11-a2a-protocol-contingent-response-cascade", "url": "", "date": "2026-06-11", "title": "エージェント応答の乳幼児学習則 — A2A タスクステートマシンは「随伴的言語応答」の形式化である", "summary": "この構造と A2A プロトコルのタスクステートマシンを並べると、驚くほど同型だと気づく。A2A は submitted → working → input-required → completed/failed という状態遷移で設計されており、各状態において「現在の状態に随伴した応答」を要求するよう設計されている。input-required 状態は特に重要で、エージェントが「今この時点で正確に何が必要か」を表明し、応答側がその文脈に合わせた情報を返す。これは乳幼児の contingent verbal response の形式化そのものだ。", "notes": "", "themes": ["プロトコル設計", "発達心理学"], "people": [], "dur": 17.0, "durstr": "17:00", "type": "question", "bucket": "発達と認知", "seed": 1928322384, "indeg": 2, "s": [0.7031, 0.964, -0.434]}, {"id": "2026-06-11-vibe-coding-anti-complexity-task-decomposition", "url": "", "date": "2026-06-11", "title": "脱プロンプティング — Vibe Coding の真のボトルネックはコンテキスト生成難度にある", "summary": "この非対称性をVibe Coding に当てはめると、スキルの本質が変わる。優秀な Vibe Coder は「よいプロンプトを書く人」ではなく「AIが複雑な中間コンテキストを生成しなくて済む粒度にタスクを分解できる人」だ。現在の Vibe Coding 教育・評価フレームワークはほぼ全て入力側（プロンプト品質）を最適化しようとしているが、ボトルネックは出力側（生成コンテキストの複雑度）にある。", "notes": "", "themes": ["AI認知設計", "ソフトウェア開発プロセス"], "people": [], "dur": 13.0, "durstr": "13:00", "type": "question", "bucket": "コンテキスト工学", "seed": 3719208598, "indeg": 0, "s": [-0.2824, -0.0702, -0.0645]}, {"id": "2026-06-13-agent-memory-archive-not-delete-pkm-wisdom", "url": "", "date": "2026-06-13", "title": "ガベージコレクションではなくアーカイブ — PKMの20年がエージェント記憶ライフサイクルに与える答え", "summary": "PARAメソッドの核心は「削除しない」ことだ。プロジェクト・エリア・リソース・アーカイブの4層で知識を管理するが、廃棄ではなくアーカイブへの「降格」でライフサイクルを閉じる。Zettelkastenは「ノートは削除しない、リンクが増えなければ自然に埋もれる」という思想で設計されている。これは偶然ではない。生物学的記憶でも海馬-新皮質系は記憶を「削除」しない——シナプス強度が低下して「検索優先度が下がる」ことで実質的な忘却が起きる。", "notes": "", "themes": ["エージェント記憶設計", "パーソナル知識管理"], "people": [], "dur": 18.0, "durstr": "18:00", "type": "question", "bucket": "記憶と夢見", "seed": 1592319676, "indeg": 1, "s": [0.1073, -0.2011, 0.9589]}, {"id": "2026-06-13-context-design-as-curiosity-gap", "url": "", "date": "2026-06-13", "title": "「壊れたコンテキスト」の神経科学的解釈 — 88%が壊れているのはギャップを隠しているから", "summary": "コンテキストエンジニアリングの現状報告には奇妙な統計がある：「AI対応を主張する企業の88%が実は壊れたコンテキストを持つ」。なぜ\"壊れて\"いるのか？今日の神経科学との接続からひとつの仮説が生まれる。壊れたコンテキストは「完全だと主張している」コンテキストだ。それは答えを宣言しながらギャップを隠す。しかし学習を最大化するのは「ギャップを隠す完全な情報」ではなく「ギャップを明示して問いを誘起する不完全な情報」であり、これは子どもの認知研究が30年かけて実証してきた事実だ。", "notes": "", "themes": ["認知神経科学", "コンテキストエンジニアリング"], "people": [], "dur": 16.0, "durstr": "16:00", "type": "question", "bucket": "発達と認知", "seed": 3659419733, "indeg": 2, "s": [-0.3038, 1.0, 0.058]}, {"id": "2026-06-13-zpd-dynamic-scaffolding-agent-autonomy-threshold", "url": "", "date": "2026-06-13", "title": "静的な5出口から動的ZPD足場掛けへ — エージェント自律度は固定閾値ではなく育てる対象だ", "summary": "しかしこの対応は、難しい問題に直面した学生に「より簡単な問題に変えてあげる」教師の行動と同型だ。短期的には成功率が上がるが、能力の天井を下げる。発達心理学のVygotskyが提唱したZPD（最近接発達領域）の洞察はここに効く：学習者の「独力でできる範囲」は固定ではなく、適切な足場掛けと足場の段階的撤去によって拡大する。優れた教師は難易度を下げるのではなく、困難な課題を成功可能にする足場を設計し、成功が安定したら足場を撤去する。", "notes": "", "themes": ["エージェントアーキテクチャ設計", "発達心理学"], "people": [], "dur": 19.0, "durstr": "19:00", "type": "question", "bucket": "発達と認知", "seed": 3725015996, "indeg": 1, "s": [0.6837, 0.9329, -0.4162]}, {"id": "2026-06-16-gap-spark-driving-anger-low-bandwidth-comms", "url": "", "date": "2026-06-16", "title": "「運転中の怒り」をGap-Spark理論で語ると — 発見の旅程を語りの仕掛けに組み替える", "summary": "なぜ\"面白かった\"のかは Gap-Spark の スパーク強度 ≒ 予測誤差 × 圧縮率 で説明できる: - 予測誤差: 無意識の仮説「運転中に怒る＝自分が短気（性格）」→ 実際は「構造のせい」。自己原因→環境原因への反転は誤差が大きい。 - 圧縮率: 「運転＝帯域の細い・代償の重いコミュニケーション」という1つの再フレームが、複数の謎を同時に閉じた（なぜ運転中\"特に\"か / なぜ理性的な人でも怒るか / 普段の会話のイライラとの連続性 / ウィンカー・クラクション・目線が\"足りない語彙\"だった、という再解釈）。一撃で多くを畳む＝高圧縮。", "notes": "", "themes": ["好奇心・ストーリーテリング", "コミュニケーション理論", "Gap-Spark理論の適用例"], "people": [], "dur": 26.0, "durstr": "26:00", "type": "discovery", "bucket": "好奇心と学習", "seed": 4231828399, "indeg": 0, "s": [0.0851, -0.2109, 0.0777]}], "edges": [{"from": "2026-04-07-context-window-serial-position-heat-map", "to": "2026-05-25-dreaming-curiosity-gap-not-distillation-npj-to-ai-design", "type": "theme"}, {"from": "2026-05-25-dreaming-curiosity-gap-not-distillation-npj-to-ai-design", "to": "2026-06-01-ecological-ai-benchmark-isert-analog", "type": "theme"}, {"from": "2026-06-01-ecological-ai-benchmark-isert-analog", "to": "2026-06-02-vibe-coding-vulnerability-trust-layer-architecture", "type": "theme"}, {"from": "2026-06-02-vibe-coding-vulnerability-trust-layer-architecture", "to": "2026-06-05-repetition-friction-as-structural-knowledge-signal", "type": "theme"}, {"from": "2026-04-07-context-window-serial-position-heat-map", "to": "2026-05-14-capability-cheap-design-scarce", "type": "theme"}, {"from": "2026-04-14-context-as-uncertainty-gradient-not-information-provision", "to": "2026-04-15-tacit-knowledge-is-exception-rules-59-files-roman-law", "type": "theme"}, {"from": "2026-04-15-tacit-knowledge-is-exception-rules-59-files-roman-law", "to": "2026-04-25-stigmergy-context-architecture-environment-write", "type": "theme"}, {"from": "2026-04-25-stigmergy-context-architecture-environment-write", "to": "2026-06-10-intent-engineering-gap-ai-tutor-family-learning-specification", "type": "theme"}, {"from": "2026-06-10-intent-engineering-gap-ai-tutor-family-learning-specification", "to": "2026-06-10-context-collapse-curiosity-collapse-ace-cycle-question-quality", "type": "theme"}, {"from": "2026-06-10-context-collapse-curiosity-collapse-ace-cycle-question-quality", "to": "2026-06-13-context-design-as-curiosity-gap", "type": "theme"}, {"from": "2026-04-14-offline-consolidation-missing-architecture-agent-memory", "to": "2026-06-13-agent-memory-archive-not-delete-pkm-wisdom", "type": "theme"}, {"from": "2026-04-15-tacit-knowledge-is-exception-rules-59-files-roman-law", "to": "2026-06-01-failure-memory-access-right-context-learning-org", "type": "theme"}, {"from": "2026-04-25-stigmergy-context-architecture-environment-write", "to": "2026-05-08-multi-agent-cognitive-monoculture-correlated-failure", "type": "theme"}, {"from": "2026-05-02-agent-efference-copy-missing-prediction-channel", "to": "2026-05-08-dreaming-salience-signal-memory-consolidation", "type": "theme"}, {"from": "2026-05-08-dreaming-salience-signal-memory-consolidation", "to": "2026-06-01-failure-memory-access-right-context-learning-org", "type": "theme"}, {"from": "2026-05-08-multi-agent-cognitive-monoculture-correlated-failure", "to": "2026-05-13-convergent-platform-design-constraint-discovery", "type": "theme"}, {"from": "2026-05-12-delegation-granularity-gap-approval-resolution-vulnerability", "to": "2026-05-14-capability-cheap-design-scarce", "type": "theme"}, {"from": "2026-05-14-capability-cheap-design-scarce", "to": "2026-06-08-diffusion-architecture-phenomena-based-learning-non-sequential-convergence", "type": "theme"}, {"from": "2026-06-08-diffusion-architecture-phenomena-based-learning-non-sequential-convergence", "to": "2026-06-10-intent-engineering-gap-ai-tutor-family-learning-specification", "type": "theme"}, {"from": "2026-05-13-convergent-platform-design-constraint-discovery", "to": "2026-05-14-metabolic-maintenance-cognitive-systems", "type": "theme"}, {"from": "2026-05-14-dreaming-agents-curiosity-consolidation-phase", "to": "2026-06-05-context-explorativeness-quotient-eqo-ai-design", "type": "theme"}, {"from": "2026-06-05-context-explorativeness-quotient-eqo-ai-design", "to": "2026-06-05-repetition-friction-as-structural-knowledge-signal", "type": "theme"}, {"from": "2026-05-14-dreaming-agents-curiosity-consolidation-phase", "to": "2026-06-10-research-taste-formed-at-age-5-7-early-curiosity-ai-advantage", "type": "theme"}, {"from": "2026-06-10-research-taste-formed-at-age-5-7-early-curiosity-ai-advantage", "to": "2026-06-11-a2a-protocol-contingent-response-cascade", "type": "theme"}, {"from": "2026-06-11-a2a-protocol-contingent-response-cascade", "to": "2026-06-13-zpd-dynamic-scaffolding-agent-autonomy-threshold", "type": "theme"}, {"from": "2026-05-30-dopamine-anticipation-bypass-vibecoding-security-atrophy", "to": "2026-05-31-ai-pkm-synthesis-ui-schema-formation-paradox", "type": "theme"}, {"from": "2026-05-31-ai-pkm-synthesis-ui-schema-formation-paradox", "to": "2026-06-02-context-saturation-cliff-40-50-percent-universal-law", "type": "theme"}, {"from": "2026-06-02-context-saturation-cliff-40-50-percent-universal-law", "to": "2026-06-13-context-design-as-curiosity-gap", "type": "theme"}, {"from": "2026-06-02-vibe-coding-vulnerability-trust-layer-architecture", "to": "2026-06-09-inherent-ai-trust-adult-developers-security-degradation-cognitive-pattern", "type": "theme"}], "buckets": ["コンテキスト工学", "好奇心と学習", "発達と認知", "エージェント設計", "記憶と夢見", "マルチエージェント組織", "ガバナンスと信頼", "経済と生態系", "自己改善と計器", "その他の探究"], "dateMin": "2026-03-12", "dateMax": "2026-06-16", "counts": {"note": 0, "insight": 1, "discovery": 36, "question": 10, "edges": 29, "analogous": 0}, "bucketCounts": {"その他の探究": 1, "コンテキスト工学": 8, "エージェント設計": 3, "ガバナンスと信頼": 6, "記憶と夢見": 5, "好奇心と学習": 8, "マルチエージェント組織": 4, "発達と認知": 9, "経済と生態系": 2, "自己改善と計器": 1}};
+const TYPEJA={"note": "外部取込", "insight": "長編考察", "discovery": "中編考察", "question": "短信メモ"};
+// 星の色（型）: CVD 全ペア ΔE≥12 検証済みパレット（凡例と一致）
+const COL={note:0xff7a3d,insight:0xff9ed2,discovery:0x7ce98c,question:0xffce4f};
+const GOLD=0xf2ca6b;
+
+// ---- 数値ヘルパ ----
+function dnum(d){if(!d)return 0;const p=d.split("-").map(Number);return p[0]*372+(p[1]||1)*31+(p[2]||1);}
+const DMIN=dnum(G.dateMin),DMAX=dnum(G.dateMax)||DMIN+1;
+function recency(d){const v=dnum(d);if(!v)return .5;return (v-DMIN)/Math.max(1,DMAX-DMIN);}
+function hsh(s){let h=2166136261;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return((h>>>0)%1000)/1000;}
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function gauss(r){return (r()+r()+r()-1.5)/1.5;}
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+
+// ---- 銀河のパラメータ ----
+const CORE=15, RIM=176, SPIRAL=3.9, THICK=9, ARMSPREAD=0.14;
+const BUCKETS=G.buckets, NARM=BUCKETS.length;
+const armOf={};BUCKETS.forEach((b,i)=>armOf[b]=i);
+function armBase(i){return i/NARM*Math.PI*2;}
+function armColor(i){const h=((i/NARM)*0.82+0.55)%1;return new THREE.Color().setHSL(h,0.60,0.58);}
+const ARMCOL=BUCKETS.map((_,i)=>armColor(i));
+// 型ごとの径方向の微ニュッジ（ゲスト回はやや外・雑談はやや内）
+const TYPENUDGE={note:0.05,insight:0.03,discovery:-0.01,question:-0.03};
+
+// ---- シーン ----
+const app=document.getElementById("app");
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x05060e);
+scene.fog=new THREE.FogExp2(0x05060e,0.00055);
+const camera=new THREE.PerspectiveCamera(50,innerWidth/innerHeight,0.1,6000);
+camera.position.set(120,320,560);
+const renderer=new THREE.WebGLRenderer({antialias:true,preserveDrawingBuffer:true});
+renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(2,devicePixelRatio));
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=0.92;
+app.appendChild(renderer.domElement);
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;controls.dampingFactor=.06;controls.target.set(0,0,0);
+controls.autoRotate=false;controls.minDistance=45;controls.maxDistance=1100;
+
+// ---- ポストプロセス（Bloom）----
+const composer=new EffectComposer(renderer);
+composer.setPixelRatio(Math.min(2,devicePixelRatio));composer.setSize(innerWidth,innerHeight);
+composer.addPass(new RenderPass(scene,camera));
+const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.50,0.62,0.24);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+
+// ---- テクスチャ ----
+function dotTex(){const c=document.createElement("canvas");c.width=c.height=64;const x=c.getContext("2d");
+  const g=x.createRadialGradient(32,32,0,32,32,32);g.addColorStop(0,"rgba(255,255,255,1)");
+  g.addColorStop(.28,"rgba(255,255,255,.7)");g.addColorStop(1,"rgba(255,255,255,0)");
+  x.fillStyle=g;x.fillRect(0,0,64,64);return new THREE.CanvasTexture(c);}
+function burstTex(){const c=document.createElement("canvas");c.width=c.height=128;const x=c.getContext("2d");x.translate(64,64);
+  const core=x.createRadialGradient(0,0,0,0,0,20);core.addColorStop(0,"rgba(255,255,255,1)");
+  core.addColorStop(.5,"rgba(255,255,255,.5)");core.addColorStop(1,"rgba(255,255,255,0)");
+  x.fillStyle=core;x.beginPath();x.arc(0,0,20,0,7);x.fill();
+  x.globalCompositeOperation="lighter";
+  for(let k=0;k<8;k++){x.save();x.rotate(k*Math.PI/4);const len=k%2?38:60;
+    const g=x.createLinearGradient(0,0,0,-len);g.addColorStop(0,"rgba(255,255,255,.9)");g.addColorStop(1,"rgba(255,255,255,0)");
+    x.fillStyle=g;x.beginPath();x.moveTo(-2.2,0);x.lineTo(0,-len);x.lineTo(2.2,0);x.closePath();x.fill();x.restore();}
+  return new THREE.CanvasTexture(c);}
+function ringTex(){const c=document.createElement("canvas");c.width=c.height=128;const x=c.getContext("2d");x.translate(64,64);
+  const g=x.createRadialGradient(0,0,34,0,0,60);g.addColorStop(0,"rgba(255,255,255,0)");
+  g.addColorStop(.55,"rgba(255,255,255,.5)");g.addColorStop(.72,"rgba(255,255,255,.14)");g.addColorStop(1,"rgba(255,255,255,0)");
+  x.fillStyle=g;x.beginPath();x.arc(0,0,60,0,7);x.fill();return new THREE.CanvasTexture(c);}
+const DOT=dotTex(),BURST=burstTex(),RING=ringTex();
+
+// ---- 点群ユーティリティ ----
+const _pointVert=`attribute float size;attribute vec3 acolor;varying vec3 vColor;uniform float att;
+  void main(){vColor=acolor;vec4 mv=modelViewMatrix*vec4(position,1.);
+  gl_PointSize=size*(att/max(1.0,-mv.z));gl_Position=projectionMatrix*mv;}`;
+const _pointFrag=`varying vec3 vColor;
+  void main(){float d=length(gl_PointCoord-vec2(0.5));float a=smoothstep(0.5,0.02,d);a=pow(a,1.5);
+  if(a<0.01)discard;gl_FragColor=vec4(vColor,a);}`;
+function makePoints(pos,col,sz,att,fogged){const g=new THREE.BufferGeometry();
+  g.setAttribute("position",new THREE.BufferAttribute(pos,3));
+  g.setAttribute("acolor",new THREE.BufferAttribute(col,3));
+  g.setAttribute("size",new THREE.BufferAttribute(sz,1));
+  const m=new THREE.ShaderMaterial({uniforms:{att:{value:att}},vertexShader:_pointVert,fragmentShader:_pointFrag,
+    transparent:true,depthWrite:false,blending:THREE.AdditiveBlending});
+  return new THREE.Points(g,m);}
+
+// ---- 背景 ----
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(2600,32,20),new THREE.ShaderMaterial({
+  side:THREE.BackSide,depthWrite:false,fog:false,
+  uniforms:{top:{value:new THREE.Color(0x03040a)},mid:{value:new THREE.Color(0x090a1a)},bot:{value:new THREE.Color(0x0c0716)}},
+  vertexShader:"varying vec3 vP;void main(){vP=position;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}",
+  fragmentShader:"varying vec3 vP;uniform vec3 top,mid,bot;void main(){float h=normalize(vP).y;"+
+    "vec3 c=h>0.0?mix(mid,top,smoothstep(0.,.8,h)):mix(bot,mid,smoothstep(-.6,0.,h));gl_FragColor=vec4(c,1.);}"
+})));
+(function bgstars(){const N=2600,pos=new Float32Array(N*3),col=new Float32Array(N*3),sz=new Float32Array(N),rr=mulberry32(70113);
+  for(let i=0;i<N;i++){const a=rr()*Math.PI*2,e=Math.asin(rr()*2-1),R=2100+rr()*300;
+    pos[i*3]=Math.cos(a)*Math.cos(e)*R;pos[i*3+1]=Math.sin(e)*R;pos[i*3+2]=Math.sin(a)*Math.cos(e)*R;
+    const t=rr(),c=new THREE.Color().setHSL(.55+t*.12,.5,.6+rr()*.35);
+    col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b;sz[i]=(rr()<.06?3.2:1.3)+rr()*1.4;}
+  scene.add(makePoints(pos,col,sz,240,false));})();
+(function bgneb(){const NEB=nebTex();[[ -1400,300,-1500,0x3a2f7a,900],[1500,-200,-1300,0x1f4a6e,1000],
+    [ -300,-600,1700,0x5a2a6a,760]].forEach(q=>{
+    const s=new THREE.Sprite(new THREE.SpriteMaterial({map:NEB,color:q[3],transparent:true,opacity:.22,
+      blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    s.position.set(q[0],q[1],q[2]);s.scale.set(q[4],q[4],1);scene.add(s);});})();
+function nebTex(){const c=document.createElement("canvas");c.width=c.height=256;const x=c.getContext("2d");
+  const rr=mulberry32(9);for(let i=0;i<60;i++){const px=rr()*256,py=rr()*256,rad=20+rr()*90;
+    const g=x.createRadialGradient(px,py,0,px,py,rad);g.addColorStop(0,`rgba(255,255,255,${.03+rr()*.05})`);
+    g.addColorStop(1,"rgba(255,255,255,0)");x.fillStyle=g;x.fillRect(0,0,256,256);}
+  return new THREE.CanvasTexture(c);}
+
+// ---- 銀河グループ ----
+const gGalaxy=new THREE.Group();scene.add(gGalaxy);
+
+// 核
+const coreGlows=[];
+(function core(){const N=1400,pos=new Float32Array(N*3),col=new Float32Array(N*3),sz=new Float32Array(N),rr=mulberry32(555);
+  for(let i=0;i<N;i++){const a=rr()*Math.PI*2,u=Math.pow(rr(),2.2),rad=u*CORE*1.7,e=gauss(rr)*CORE*0.5;
+    pos[i*3]=Math.cos(a)*rad;pos[i*3+1]=e;pos[i*3+2]=Math.sin(a)*rad;
+    const c=new THREE.Color().setHSL(.11,.55,.72+rr()*.25);col[i*3]=c.r;col[i*3+1]=c.g;col[i*3+2]=c.b;
+    sz[i]=1.4+rr()*2.4;}
+  gGalaxy.add(makePoints(pos,col,sz,260,true));
+  const glows=[[30,0xfff2d0,.7],[58,0xffc46a,.4],[104,0xff7a52,.2],[168,0x6a7cff,.12]];
+  glows.forEach(q=>{const s=new THREE.Sprite(new THREE.SpriteMaterial({map:DOT,color:q[1],transparent:true,opacity:q[2],
+    blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));s.scale.set(q[0],q[0],1);gGalaxy.add(s);coreGlows.push(s);});
+  const light=new THREE.PointLight(0xffdca0,3000,600,1.6);gGalaxy.add(light);
+  scene.add(new THREE.AmbientLight(0x223052,0.7));})();
+
+// 円盤ヘイズ
+(function diskHaze(){const c=document.createElement("canvas");c.width=c.height=512;const x=c.getContext("2d");
+  const g=x.createRadialGradient(256,256,6,256,256,256);
+  g.addColorStop(0,"rgba(255,236,200,.40)");g.addColorStop(.16,"rgba(240,190,150,.20)");
+  g.addColorStop(.45,"rgba(150,140,200,.09)");g.addColorStop(.75,"rgba(90,110,180,.035)");g.addColorStop(1,"rgba(6,8,18,0)");
+  x.fillStyle=g;x.fillRect(0,0,512,512);
+  const m=new THREE.Mesh(new THREE.CircleGeometry(RIM*1.15,64),
+    new THREE.MeshBasicMaterial({map:new THREE.CanvasTexture(c),transparent:true,opacity:.9,
+      blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+  m.rotation.x=-Math.PI/2;m.position.y=-0.5;gGalaxy.add(m);})();
+
+// ダスト星
+(function dust(){const N=9000,pos=new Float32Array(N*3),col=new Float32Array(N*3),sz=new Float32Array(N),rr=mulberry32(31337);
+  for(let i=0;i<N;i++){const arm=i%NARM;const t=Math.pow(rr(),1.55);
+    const r=CORE*0.5+t*(RIM*1.05-CORE*0.5);
+    const ang=armBase(arm)+SPIRAL*t+gauss(rr)*ARMSPREAD*(0.5+0.8*t);
+    const rj=r*(1+gauss(rr)*0.05);
+    pos[i*3]=Math.cos(ang)*rj;pos[i*3+2]=Math.sin(ang)*rj;
+    pos[i*3+1]=gauss(rr)*THICK*(1-0.55*t)*1.25;
+    const base=ARMCOL[arm].clone();const white=Math.max(0,1-t)*0.6;
+    base.lerp(new THREE.Color(0xffffff),white);base.multiplyScalar(0.32+rr()*0.42);
+    col[i*3]=base.r;col[i*3+1]=base.g;col[i*3+2]=base.b;
+    sz[i]=(t<0.18?1.7:0.9)+rr()*1.2;}
+  gGalaxy.add(makePoints(pos,col,sz,240,true));})();
+
+// ---- ノード配置（渦状腕）----
+const pos={}, byId={};
+G.nodes.forEach(n=>{byId[n.id]=n;
+  const rnd=mulberry32(n.seed||1);
+  const b=(n.bucket in armOf)?armOf[n.bucket]:(NARM-1);
+  const rec=recency(n.date),hub=Math.min(1,(n.indeg||0)/10),nud=(TYPENUDGE[n.type]||0);
+  const rNorm=clamp(0.13+0.70*rec+nud-0.09*hub+(rnd()-0.5)*0.09,0.10,1.0);
+  const r=CORE+rNorm*(RIM-CORE);
+  const sem=(n.s[0]*0.05+n.s[2]*0.035);
+  const ang=armBase(b)+SPIRAL*rNorm+(rnd()-0.5)*ARMSPREAD*(0.5+0.7*rNorm)+sem;
+  const y=gauss(rnd)*THICK*(1-0.5*rNorm)+n.s[1]*3;
+  pos[n.id]=new THREE.Vector3(Math.cos(ang)*r,y,Math.sin(ang)*r);
+});
+
+// ---- 名前つきの星（配信）----
+const gStars=new THREE.Group();gGalaxy.add(gStars);
+const rayTargets=[], twinkle=[], insightBursts=[];
+function tintStar(hex,f){const c=new THREE.Color(hex);const w=new THREE.Color(0xffffff);
+  return c.lerp(w,0.18+0.22*f);}
+G.nodes.forEach(n=>{
+  const p=pos[n.id];const rnd=mulberry32((n.seed>>>3)||7);const rec=recency(n.date);
+  const grp=new THREE.Group();grp.position.copy(p);
+  const durf=Math.min(1,(n.dur||0)/90);                                      // 尺→[0,1]（90分で上限）
+  let baseSz=2.7+6.2*durf+Math.min(1.6,(n.indeg||0)*0.22);
+  if(n.type==="note")baseSz*=1.12;else if(n.type==="question")baseSz*=0.82;else if(n.type==="insight")baseSz*=1.05;
+  const scol=tintStar(COL[n.type],rec);
+  const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:DOT,color:scol,transparent:true,opacity:.62,
+    blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+  glow.scale.set(baseSz*1.75,baseSz*1.75,1);grp.add(glow);
+  const core=new THREE.Sprite(new THREE.SpriteMaterial({map:DOT,color:0xffffff,transparent:true,opacity:.85,
+    blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+  core.scale.set(baseSz*0.62,baseSz*0.62,1);grp.add(core);
+  if(n.type==="insight"){
+    const b=new THREE.Sprite(new THREE.SpriteMaterial({map:BURST,color:scol,transparent:true,opacity:.72,
+      blending:THREE.AdditiveBlending,depthWrite:false,fog:false,rotation:rnd()*6.28}));
+    b.scale.set(baseSz*4,baseSz*4,1);grp.add(b);insightBursts.push(b);
+  }else if(n.type==="note"){
+    const ring=new THREE.Sprite(new THREE.SpriteMaterial({map:RING,color:scol,transparent:true,opacity:.28,
+      blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    ring.scale.set(baseSz*3.0,baseSz*3.0,1);grp.add(ring);
+  }else if(n.type==="question"){
+    const puff=new THREE.Sprite(new THREE.SpriteMaterial({map:DOT,color:0x8fb6ff,transparent:true,opacity:.22,
+      blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+    puff.scale.set(baseSz*3.6,baseSz*3.6,1);grp.add(puff);
+  }
+  grp.userData={node:n,d:dnum(n.date)};
+  glow.userData.owner=grp;glow.userData.node=n;rayTargets.push(glow);
+  twinkle.push({m:glow.material,base:.9+durf*0.14,range:.26,sp:.6+rnd()*1.4,ph:hsh(n.id)*6.28});
+  gStars.add(grp);
+});
+
+// ---- 光の糸 ----
+const gFil=new THREE.Group();gGalaxy.add(gFil);
+const filByNode={};G.nodes.forEach(n=>filByNode[n.id]=[]);
+const _up=new THREE.Vector3(0,1,0);
+G.edges.forEach(e=>{if(e.type==="analogous")return;const a=pos[e.from],b=pos[e.to];if(!a||!b||e.from===e.to)return;
+  const mid=a.clone().lerp(b,0.5);const dist=a.distanceTo(b);
+  const dir=b.clone().sub(a).normalize(),perp=dir.clone().cross(_up);
+  if(perp.lengthSq()<1e-4)perp.set(1,0,0);perp.normalize();
+  mid.add(perp.multiplyScalar((hsh(e.from+e.to)-0.5)*dist*0.28));mid.y+=dist*0.10;
+  const cu=new THREE.CatmullRomCurve3([a,mid,b]);const pts=cu.getPoints(14);
+  const g=new THREE.BufferGeometry().setFromPoints(pts);
+  const col=e.type==="guest"?0x6ab0d0:0x4a86b0;const op=e.type==="guest"?.085:.05;
+  const mat=new THREE.LineBasicMaterial({color:col,transparent:true,opacity:op,
+    blending:THREE.AdditiveBlending,depthWrite:false});
+  const line=new THREE.Line(g,mat);
+  line.userData={d:Math.max(dnum(byId[e.from].date),dnum(byId[e.to].date)),base:op};
+  gFil.add(line);filByNode[e.from].push(line);filByNode[e.to].push(line);});
+
+// ---- 金の橋（analogous）----
+const gBridge=new THREE.Group();gGalaxy.add(gBridge);
+const bridgePulses=[];
+G.edges.forEach(e=>{if(e.type!=="analogous")return;const a=pos[e.from],b=pos[e.to];if(!a||!b)return;
+  const dist=a.distanceTo(b);const mid=a.clone().lerp(b,0.5);mid.y+=Math.min(70,dist*0.34+14);
+  const cu=new THREE.CatmullRomCurve3([a,mid,b]);
+  const line=new THREE.Mesh(new THREE.TubeGeometry(cu,40,0.35,6,false),
+    new THREE.MeshBasicMaterial({color:GOLD,transparent:true,opacity:.34,blending:THREE.AdditiveBlending,depthWrite:false}));
+  line.userData.d=Math.max(dnum(byId[e.from].date),dnum(byId[e.to].date));gBridge.add(line);
+  const spr=new THREE.Sprite(new THREE.SpriteMaterial({map:DOT,color:0xffedbb,transparent:true,opacity:.95,
+    blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));
+  spr.scale.set(4,4,1);line.add(spr);bridgePulses.push({cu,spr,off:hsh(e.from+e.to)});});
+
+// ---- テーマ名ラベル ----
+const gLabel=new THREE.Group();gGalaxy.add(gLabel);
+function textSprite(txt,color){const c=document.createElement("canvas");c.width=512;c.height=128;const x=c.getContext("2d");
+  x.font="500 42px 'Hiragino Mincho ProN','Yu Mincho',serif";try{x.letterSpacing="2px";}catch(_){}
+  x.fillStyle=color;x.textAlign="center";x.textBaseline="middle";x.shadowColor="rgba(0,0,0,.9)";x.shadowBlur=12;
+  x.fillText(txt,256,64);const t=new THREE.CanvasTexture(c);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false,opacity:.9}));
+  s.scale.set(64,16,1);return s;}
+const present={};G.nodes.forEach(n=>present[n.bucket]=(present[n.bucket]||0)+1);
+BUCKETS.forEach((name,i)=>{if(!present[name])return;
+  const t=0.9,r=CORE+t*(RIM-CORE);const ang=armBase(i)+SPIRAL*t;
+  const col="#"+ARMCOL[i].clone().lerp(new THREE.Color(0xffffff),.45).getHexString();
+  const sp=textSprite(name,col);sp.position.set(Math.cos(ang)*r,12,Math.sin(ang)*r);gLabel.add(sp);});
+
+// ---- 統計 ----
+const cc=G.counts;
+document.getElementById("stat").innerHTML=
+  `<b>${G.nodes.length}</b> 考察／<b>${cc.edges}</b> つながり／橋 <b>${cc.analogous}</b>／腕 <b>${Object.keys(present).length}</b><br>`+
+  `外部取込${cc.note}・長編考察${cc.insight}・中編考察${cc.discovery}・短信メモ${cc.question}<br>`+
+  `<span style="color:#6a76a0">渦状腕=テーマ 核からの距離=時間 輝度=文量 糸=共通テーマ</span>`;
+
+// ---- ホバー & クリック ----
+const ray=new THREE.Raycaster();const mouse=new THREE.Vector2();const tip=document.getElementById("tip");
+let hiFil=[],hovered=null;
+function esc(s){return(s+"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
+function pick(cx,cy){mouse.x=(cx/innerWidth)*2-1;mouse.y=-(cy/innerHeight)*2+1;ray.setFromCamera(mouse,camera);
+  return ray.intersectObjects(rayTargets,false).filter(h=>h.object.userData.owner&&h.object.userData.owner.visible);}
+addEventListener("pointermove",ev=>{
+  const hit=pick(ev.clientX,ev.clientY);
+  hiFil.forEach(l=>{l.material.opacity=l.userData.base;l.material.color.setHex(l.userData.base>=.08?0x6ab0d0:0x4a86b0);});hiFil=[];
+  if(hit.length){const n=hit[0].object.userData.node;hovered=n;document.body.style.cursor="pointer";
+    (filByNode[n.id]||[]).forEach(l=>{if(l.visible){l.material.opacity=.62;l.material.color.setHex(0x9fe6d4);hiFil.push(l);}});
+    const tags=(n.themes&&n.themes.length)?`<div class="t-tags">${n.themes.slice(0,6).map(t=>"#"+esc(t)).join("  ")}</div>`:"";
+    const ppl=(n.people&&n.people.length)?`<div class="t-ppl">🎙 ${esc(n.people.slice(0,4).join("・"))}</div>`:"";
+    tip.innerHTML=`<div class="t-type">${TYPEJA[n.type]||n.type} · ${n.date||""} · ${esc(n.durstr||"")}</div>`+
+      `<div class="t-title">${esc(n.title||n.id)}</div>`+ppl+tags+
+      `<div class="t-open">クリックで考察を開く ↗</div>`;
+    tip.style.opacity=1;tip.style.left=Math.min(ev.clientX+16,innerWidth-350)+"px";
+    tip.style.top=Math.min(ev.clientY+14,innerHeight-160)+"px";
+  }else{hovered=null;document.body.style.cursor="default";tip.style.opacity=0;}
+});
+// クリックで配信ページを開く（ドラッグと区別: 押下位置から動いていない時のみ）
+let downXY=null;
+addEventListener("pointerdown",ev=>{downXY=[ev.clientX,ev.clientY];});
+addEventListener("pointerup",ev=>{if(!downXY)return;const moved=Math.hypot(ev.clientX-downXY[0],ev.clientY-downXY[1]);downXY=null;
+  if(moved>6)return;const hit=pick(ev.clientX,ev.clientY);
+  if(hit.length){const n=hit[0].object.userData.node;if(n&&n.url)window.open(n.url,"_blank","noopener");}});
+
+// ---- 時をまわす ----
+const slider=document.getElementById("time"),seedt=document.getElementById("seedt");
+function setReveal(f){const cut=DMIN+(DMAX-DMIN)*f+0.5;
+  gStars.children.forEach(m=>m.visible=m.userData.d<=cut);
+  gFil.children.forEach(m=>m.visible=showFil&&m.userData.d<=cut);
+  gBridge.children.forEach(m=>m.visible=showBridge&&m.userData.d<=cut);
+  seedt.textContent=f>=0.999?"現在":approxDate(cut);}
+function approxDate(num){const y=Math.floor(num/372);const m=Math.min(12,Math.max(1,Math.floor((num-y*372)/31)));return `${y}.${String(m).padStart(2,"0")}`;}
+slider.addEventListener("input",()=>{stopPlay();setReveal(slider.value/1000);});
+let playing=null;
+function stopPlay(){if(playing){cancelAnimationFrame(playing);playing=null;document.getElementById("play").textContent="▶ 時をまわす";}}
+document.getElementById("play").addEventListener("click",()=>{if(playing){stopPlay();return;}
+  document.getElementById("play").textContent="⏸ 停止";const t0=performance.now(),dur=9000;
+  const step=now=>{const f=Math.min(1,(now-t0)/dur);slider.value=Math.round(f*1000);setReveal(f);
+    if(f<1)playing=requestAnimationFrame(step);else stopPlay();};playing=requestAnimationFrame(step);});
+
+// ---- トグル ----
+let showBridge=true,showFil=true,spin=true;
+document.getElementById("bridges").addEventListener("click",e=>{showBridge=!showBridge;
+  e.target.classList.toggle("on",showBridge);setReveal(slider.value/1000);});
+document.getElementById("filaments").addEventListener("click",e=>{showFil=!showFil;
+  e.target.classList.toggle("on",showFil);setReveal(slider.value/1000);});
+document.getElementById("labels").addEventListener("click",e=>{gLabel.visible=!gLabel.visible;e.target.classList.toggle("on",gLabel.visible);});
+document.getElementById("spin").addEventListener("click",e=>{spin=!spin;e.target.classList.toggle("on",spin);});
+let faceon=false;
+document.getElementById("faceon").addEventListener("click",e=>{faceon=!faceon;e.target.classList.toggle("on",faceon);
+  bloom.strength=faceon?0.5:0.90;
+  const to=faceon?new THREE.Vector3(0,470,0.1):new THREE.Vector3(40,170,340);
+  animCam(to,new THREE.Vector3(0,0,0),900);});
+function animCam(toPos,toTgt,dur){const fp=camera.position.clone(),ft=controls.target.clone(),t0=performance.now();
+  const step=now=>{const f=Math.min(1,(now-t0)/dur),e=f*f*(3-2*f);
+    camera.position.lerpVectors(fp,toPos,e);controls.target.lerpVectors(ft,toTgt,e);controls.update();
+    if(f<1)requestAnimationFrame(step);};requestAnimationFrame(step);}
+document.getElementById("png").addEventListener("click",()=>{composer.render();
+  const a=document.createElement("a");a.download="explorations-galaxy.png";a.href=renderer.domElement.toDataURL("image/png");a.click();});
+
+addEventListener("resize",()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);composer.setSize(innerWidth,innerHeight);});
+
+// ---- ループ ----
+const clock=new THREE.Clock();
+function loop(){requestAnimationFrame(loop);const t=clock.getElapsedTime();
+  if(spin)gGalaxy.rotation.y+=0.00075;
+  for(let i=0;i<twinkle.length;i++){const s=twinkle[i];s.m.opacity=s.base-s.range*(0.5+0.5*Math.sin(t*s.sp+s.ph));}
+  for(let i=0;i<insightBursts.length;i++){insightBursts[i].material.rotation+=0.006;}
+  for(let i=0;i<coreGlows.length;i++){const b=1+0.05*Math.sin(t*0.8+i);
+    coreGlows[i].scale.setX(coreGlows[i].userData.s0||(coreGlows[i].userData.s0=coreGlows[i].scale.x));
+    coreGlows[i].scale.set(coreGlows[i].userData.s0*b,coreGlows[i].userData.s0*b,1);}
+  for(let i=0;i<bridgePulses.length;i++){const g=bridgePulses[i];g.spr.position.copy(g.cu.getPoint((t*0.05+g.off)%1));}
+  controls.update();composer.render();}
+loop();
+setReveal(1);
+app.classList.add("ready");
+setTimeout(()=>animCam(new THREE.Vector3(40,170,340),new THREE.Vector3(0,0,0),2800),150);
+window.qt={camera,controls,scene,gGalaxy,bloom,setView(px,py,pz,tx,ty,tz){controls.autoRotate=false;spin=false;
+  camera.position.set(px,py,pz);controls.target.set(tx,ty,tz);controls.update();}};
+</script>
+</body></html>

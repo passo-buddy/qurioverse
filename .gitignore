@@ -1,0 +1,5 @@
+# 研究の銀河は公開版ビルドのみ commit する（2026-07-12 解除）
+# 生成手順: md_corpus --publish-filter → forge build → tools/check_publish.py PASS 必須
+.DS_Store
+.playwright-cli/
+.claude/

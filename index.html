@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Qurioverse — 好奇心の宇宙</title>
+<meta name="description" content="Qurioverse — 好奇心の宇宙。研究・ことば・声、すべての表現活動をひとつの宇宙として観測する。">
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="30" fill="%23060409" stroke="%23f2ca6b" stroke-width="7"/></svg>'>
+<link rel="stylesheet" href="assets/tokens.css">
+<style>
+  html, body { height: 100%; overflow: hidden; }
+
+  #scene { position: fixed; inset: 0; z-index: 0; }
+  #vig {
+    position: fixed; inset: 0; z-index: 2; pointer-events: none;
+    background: radial-gradient(ellipse 135% 100% at 50% 46%, transparent 46%, rgba(1, 2, 6, 0.72) 100%);
+  }
+
+  /* ---- 題字 ---- */
+  .masthead {
+    position: fixed; left: 50%; top: 44px; transform: translateX(-50%);
+    z-index: 5; text-align: center; pointer-events: none;
+    animation: page-in 2.4s ease both;
+  }
+  .masthead h1 {
+    font-size: 22px; margin: 0; letter-spacing: 0.42em; text-indent: 0.42em;
+    text-shadow: 0 0 34px rgba(242, 202, 107, 0.25), 0 2px 24px rgba(0, 0, 0, 0.8);
+  }
+  .masthead .sub {
+    font-size: 10.5px; letter-spacing: 0.34em; color: var(--muted);
+    margin-top: 6px; text-transform: uppercase;
+  }
+
+  /* ---- 中心の空隙（3D 空隙に投影追従する HTML ホットスポット） ---- */
+  #void {
+    position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+    z-index: 4; width: 230px; height: 230px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    cursor: default; outline: none; text-align: center; border-radius: 50%;
+  }
+  .void-q {
+    margin: 0; white-space: nowrap;
+    font-family: var(--serif); font-size: 17.5px; letter-spacing: 0.22em;
+    color: var(--gold); text-shadow: 0 0 28px rgba(242, 202, 107, 0.5);
+    opacity: 0; filter: blur(6px);
+    transition: opacity var(--fade) ease, filter var(--fade) ease;
+  }
+  .void-sub {
+    position: absolute; left: 50%; bottom: -16px; transform: translateX(-50%);
+    margin: 0; white-space: nowrap;
+    font-size: 10.5px; letter-spacing: 0.3em; color: var(--muted); opacity: 0.7;
+  }
+  #void:hover .void-q, #void:focus .void-q, #void.open .void-q { opacity: 1; filter: blur(0); }
+
+  /* ---- 銀河ラベル（3D 位置に投影追従。JS 失敗時は CSS 初期位置で生存） ---- */
+  .glabel {
+    position: fixed; z-index: 3; transform: translate(-50%, -50%);
+    text-align: center; color: var(--milk); white-space: nowrap;
+    transition: text-shadow var(--hover) ease, color var(--hover) ease;
+  }
+  .glabel .g-name { font-family: var(--serif); font-size: 15.5px; letter-spacing: 0.18em; display: block; }
+  .glabel .g-sub {
+    font-size: 9.5px; letter-spacing: 0.24em; color: var(--muted);
+    text-transform: uppercase; display: block; margin-top: 5px;
+  }
+  .glabel.hot .g-name, .glabel:hover .g-name, .glabel:focus-visible .g-name {
+    color: var(--gold); text-shadow: 0 0 22px rgba(242, 202, 107, 0.55);
+  }
+  #l-kenkyu { left: 72%; top: 40%; }
+  #l-kotoba { left: 20%; top: 46%; }
+  #l-koe    { left: 68%; top: 76%; opacity: 0.75; }
+
+  .speck-label {
+    position: fixed; z-index: 3; transform: translate(-50%, -50%); pointer-events: none;
+    font-size: 10px; letter-spacing: 0.22em; color: var(--muted); opacity: 0.55; white-space: nowrap;
+  }
+  #l-apps { left: 26%; top: 74%; }
+  #l-hand { left: 84%; top: 24%; }
+
+  /* ---- 航法（下部・二重表記） ---- */
+  .helm {
+    position: fixed; left: 50%; bottom: 30px; transform: translateX(-50%);
+    z-index: 5; display: flex; gap: 44px;
+    font-size: 12.5px; letter-spacing: 0.14em; white-space: nowrap;
+  }
+  .helm a { color: var(--muted); }
+  .helm a:hover, .helm a:focus-visible { color: var(--gold); text-shadow: 0 0 18px rgba(242, 202, 107, 0.4); }
+  .helm .en-sub { font-size: 9px; letter-spacing: 0.2em; display: block; text-align: center; opacity: 0.7; margin-top: 3px; }
+
+  @media (max-width: 720px) {
+    .helm { gap: 26px; }
+    .masthead h1 { font-size: 19px; }
+    .masthead .sub { font-size: 9px; letter-spacing: 0.2em; white-space: nowrap; }
+    .void-q { font-size: 15px; }
+    #void { width: 170px; height: 170px; }
+    .void-sub { bottom: -10px; }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="scene" aria-hidden="true"></canvas>
+<div id="vig" aria-hidden="true"></div>
+
+<header class="masthead">
+  <h1>Qurioverse</h1>
+  <div class="sub">好奇心の宇宙 — A Universe of Curiosity</div>
+</header>
+
+<div id="void" tabindex="0" role="note" aria-label="中心の問い: なぜ、わかりたいのか。">
+  <p class="void-q">なぜ、わかりたいのか。</p>
+  <p class="void-sub">知性は隙間に宿る</p>
+</div>
+
+<a class="glabel" id="l-kenkyu" href="galaxies/kenkyu/">
+  <span class="g-name">研究の銀河</span>
+  <span class="g-sub">Explorations · 考察の渦</span>
+</a>
+<a class="glabel" id="l-kotoba" href="galaxies/kotoba/">
+  <span class="g-name">ことばの銀河</span>
+  <span class="g-sub">Note · 書いたものの渦</span>
+</a>
+<a class="glabel" id="l-koe" href="galaxies/koe/">
+  <span class="g-name">声の銀河</span>
+  <span class="g-sub">Voice · 観測準備中</span>
+</a>
+<div class="speck-label" id="l-apps">作品の星団 · 準備中</div>
+<div class="speck-label" id="l-hand">手の星雲 · 準備中</div>
+
+<nav class="helm" aria-label="航法">
+  <a href="about/">観測者について<span class="en-sub">About</span></a>
+  <a href="contact/">交信<span class="en-sub">Contact / ご依頼</span></a>
+  <a href="fuel/">燃料補給<span class="en-sub">Support</span></a>
+</nav>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"
+}}
+</script>
+<script type="module">
+/* 入口の宇宙 — 銀河ビュー（engine/galaxy.py）と同じ描画語彙:
+   three@0.161.0 / AdditiveBlending / FogExp2 / UnrealBloomPass。
+   乱数はすべて固定シード（決定論）。動きは遅い＝宇宙の時間感覚。 */
+import * as THREE from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const GOLD = 0xf2ca6b, MILK = 0xece3d0, CYAN = 0x9fe8dc, BG = 0x060409;
+
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function gauss(r){return (r()+r()+r()-1.5)/1.5;}
+
+const canvas = document.getElementById("scene");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(BG);
+scene.fog = new THREE.FogExp2(BG, 0.0016);
+
+const camera = new THREE.PerspectiveCamera(55, innerWidth / innerHeight, 0.1, 2000);
+
+/* ---- 発光テクスチャ（radial gradient・生成的） ---- */
+function glowTex(rgb, midStop = 0.35) {
+  const c = document.createElement("canvas"); c.width = c.height = 128;
+  const g = c.getContext("2d");
+  const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64);
+  gr.addColorStop(0, `rgba(${rgb},1)`);
+  gr.addColorStop(midStop, `rgba(${rgb},0.28)`);
+  gr.addColorStop(1, `rgba(${rgb},0)`);
+  g.fillStyle = gr; g.fillRect(0, 0, 128, 128);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const TEX = {
+  warm: glowTex("242,202,107"),
+  milk: glowTex("236,227,208"),
+  dot: glowTex("255,255,255", 0.22),
+  violet: glowTex("96,64,150", 0.5),
+  teal: glowTex("34,96,104", 0.5),
+  ember: glowTex("140,84,40", 0.5),
+};
+function sprite(tex, color, scale, opacity) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: tex, color, transparent: true, opacity,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  s.scale.set(scale, scale, 1);
+  return s;
+}
+
+/* ---- 星野（深度つき2層 + 微星塵） ---- */
+function starDome(seed, n, rMin, rMax, size, opacity) {
+  const rnd = mulberry32(seed);
+  const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+  const milk = new THREE.Color(MILK), gold = new THREE.Color(GOLD);
+  for (let i = 0; i < n; i++) {
+    const th = rnd() * Math.PI * 2, ph = Math.acos(2 * rnd() - 1);
+    const r = rMin + rnd() * (rMax - rMin);
+    pos[i * 3] = r * Math.sin(ph) * Math.cos(th);
+    pos[i * 3 + 1] = r * Math.cos(ph) * 0.7;
+    pos[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th);
+    const c = rnd() < 0.2 ? gold : milk, b = 0.35 + rnd() * 0.65;
+    col[i * 3] = c.r * b; col[i * 3 + 1] = c.g * b; col[i * 3 + 2] = c.b * b;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  return new THREE.Points(g, new THREE.PointsMaterial({
+    size, map: TEX.dot, vertexColors: true, sizeAttenuation: true, transparent: true, opacity,
+    blending: THREE.AdditiveBlending, depthWrite: false, fog: false,
+  }));
+}
+const domeFar = starDome(11, 2400, 420, 780, 2.4, 0.6);
+const domeNear = starDome(12, 500, 180, 380, 3.1, 0.5);
+scene.add(domeFar, domeNear);
+
+/* ---- 星雲（遠景の淡い光雲） ---- */
+const nebulae = new THREE.Group();
+[
+  [TEX.violet, -240, 110, -520, 460, 0.085],
+  [TEX.teal, 300, -60, -560, 520, 0.07],
+  [TEX.ember, -80, -180, -480, 380, 0.055],
+  [TEX.violet, 260, 170, -600, 420, 0.05],
+].forEach(([tex, x, y, z, sc, op]) => {
+  const s = sprite(tex, 0xffffff, sc, op); s.position.set(x, y, z);
+  s.material.fog = false;
+  nebulae.add(s);
+});
+scene.add(nebulae);
+
+/* ---- 中心の空隙 — 滲む暗がり + 金の環（日蝕の光冠） ---- */
+function darkTex() {
+  const c = document.createElement("canvas"); c.width = c.height = 256;
+  const g = c.getContext("2d");
+  const gr = g.createRadialGradient(128, 128, 0, 128, 128, 128);
+  gr.addColorStop(0, "rgba(2,1,4,1)");
+  gr.addColorStop(0.55, "rgba(2,1,4,1)");
+  gr.addColorStop(0.72, "rgba(2,1,4,0.55)");
+  gr.addColorStop(0.88, "rgba(2,1,4,0.18)");
+  gr.addColorStop(1, "rgba(2,1,4,0)");
+  g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+const voidG = new THREE.Group();
+const core = new THREE.Sprite(new THREE.SpriteMaterial({   // 硬い球でなく、縁の滲む暗がり
+  map: darkTex(), transparent: true, depthWrite: false, fog: false,
+}));
+core.scale.set(34, 34, 1);
+const rim = sprite(TEX.warm, GOLD, 27, 0.5);          // 核の背後の光冠（環の外へ滲む）
+const halo = sprite(TEX.warm, GOLD, 72, 0.09);        // 外側の淡い暈
+const ringFace = new THREE.Mesh(                      // 正面の細い環
+  new THREE.TorusGeometry(11.6, 0.13, 12, 220),
+  new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false })
+);
+ringFace.rotation.x = 0.22;
+const ringDisc = new THREE.Mesh(                      // 降着円盤ぎみの斜め環
+  new THREE.TorusGeometry(15.5, 0.05, 10, 220),
+  new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false })
+);
+ringDisc.rotation.x = 1.28; ringDisc.rotation.y = 0.3;
+rim.renderOrder = 1; halo.renderOrder = 1; core.renderOrder = 2; // 暗がりは光冠の上・環の下
+ringFace.renderOrder = 3; ringDisc.renderOrder = 3;
+voidG.add(rim, halo, core, ringFace, ringDisc);
+scene.add(voidG);
+
+/* ---- 渦巻銀河（腕の本数は実データと同じ） ---- */
+function makeGalaxy({ seed, arms, radius, dim = 1, tiltX, tiltZ }) {
+  const rnd = mulberry32(seed);
+  const n = Math.round(radius * 46);
+  const pos = new Float32Array(n * 3), col = new Float32Array(n * 3);
+  const milk = new THREE.Color(MILK), gold = new THREE.Color(GOLD), cyan = new THREE.Color(CYAN);
+  for (let i = 0; i < n; i++) {
+    const f = Math.pow(rnd(), 0.72);
+    const ang = (i % arms) / arms * Math.PI * 2 + f * 2.75 + gauss(rnd) * 0.16;
+    const r = 1.6 + f * radius * (0.88 + rnd() * 0.24);
+    pos[i * 3] = Math.cos(ang) * r + gauss(rnd) * 1.3;
+    pos[i * 3 + 1] = gauss(rnd) * (2.2 * (1 - f) + 0.5);
+    pos[i * 3 + 2] = Math.sin(ang) * r + gauss(rnd) * 1.3;
+    const pick = rnd();
+    const c = f < 0.22 ? milk : pick < 0.1 ? cyan : pick < 0.55 ? gold : milk;
+    const b = (0.95 - f * 0.72) * dim * (0.4 + rnd() * 0.5);
+    col[i * 3] = c.r * b; col[i * 3 + 1] = c.g * b; col[i * 3 + 2] = c.b * b;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
+  const mat = new THREE.PointsMaterial({
+    size: 1.6, map: TEX.dot, vertexColors: true, sizeAttenuation: true, transparent: true, opacity: 0.9,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  });
+  const g = new THREE.Group();
+  g.add(new THREE.Points(geo, mat));
+  g.add(sprite(TEX.warm, 0xfff2d8, radius * 0.62, 0.4 * dim)); // 銀河核
+  g.add(sprite(TEX.milk, MILK, radius * 2.1, 0.06 * dim));     // 円盤の暈
+  const hit = new THREE.Mesh(                                    // 不可視の当たり判定
+    new THREE.SphereGeometry(radius * 0.85, 12, 12),
+    new THREE.MeshBasicMaterial({ visible: false })
+  );
+  g.add(hit);
+  g.rotation.set(tiltX, rnd() * Math.PI * 2, tiltZ);
+  return { group: g, mat, hit, baseSize: 1.75, spin: 0.028 + rnd() * 0.02 };
+}
+
+const GX = [
+  { key: "kenkyu", label: "l-kenkyu", href: "galaxies/kenkyu/", g: makeGalaxy({ seed: 901, arms: 9, radius: 30, tiltX: -0.86, tiltZ: 0.42 }) },
+  { key: "kotoba", label: "l-kotoba", href: "galaxies/kotoba/", g: makeGalaxy({ seed: 702, arms: 7, radius: 23, tiltX: -1.0, tiltZ: -0.34 }) },
+  { key: "koe", label: "l-koe", href: "galaxies/koe/", g: makeGalaxy({ seed: 503, arms: 5, radius: 17, dim: 0.4, tiltX: -0.72, tiltZ: 0.2 }) },
+];
+GX.forEach((x) => scene.add(x.g.group));
+
+/* ---- 未観測の光点（星団・星雲の種） ---- */
+const apps = sprite(TEX.milk, MILK, 7, 0.4);
+const hand = sprite(TEX.milk, MILK, 6, 0.35);
+scene.add(apps, hand);
+
+/* ---- レイアウト（横空/縦空で星の配置・縮尺・ラベルの逃がし方を変える） ---- */
+let portrait = false;
+const labelDY = { kenkyu: -40, kotoba: -32, koe: -24 }; // ラベルの世界座標オフセット（負=下）
+function layout() {
+  portrait = innerWidth / innerHeight < 0.9;
+  const sc = portrait ? 0.6 : 1;
+  GX.forEach((x) => x.g.group.scale.setScalar(sc));
+  if (!portrait) {
+    GX[0].g.group.position.set(64, 27, -32);
+    GX[1].g.group.position.set(-68, 2, -18);
+    GX[2].g.group.position.set(47, -25, 4);
+    apps.position.set(-30, -46, 2);
+    hand.position.set(94, -14, -26);
+    camera.position.set(0, 6, 132);
+    labelDY.kenkyu = -40; labelDY.kotoba = -32; labelDY.koe = -24;
+  } else {
+    GX[0].g.group.position.set(8, 58, -16);
+    GX[1].g.group.position.set(-14, -44, -6);
+    GX[2].g.group.position.set(24, -88, 2);
+    camera.position.set(0, -4, 230);
+    labelDY.kenkyu = -26; labelDY.kotoba = -22; labelDY.koe = 15; // 声だけ上に逃がす（航法と衝突しない）
+  }
+  apps.visible = hand.visible = !portrait;
+  document.getElementById("l-apps").style.display = portrait ? "none" : "";
+  document.getElementById("l-hand").style.display = portrait ? "none" : "";
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
+}
+
+/* ---- Bloom（銀河ビューと同じ後段） ---- */
+const composer = new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene, camera));
+const bloom = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.68, 0.62, 0.3);
+composer.addPass(bloom);
+composer.addPass(new OutputPass());
+layout();
+addEventListener("resize", layout);
+
+/* ---- ラベル投影（3D 位置 → 画面座標へ毎フレーム追従） ---- */
+const vEl = document.getElementById("void");
+const labels = GX.map((x) => ({ el: document.getElementById(x.label), obj: x.g.group, dy: -1.15 }));
+labels.push({ el: document.getElementById("l-apps"), obj: apps, dy: -1.6 });
+labels.push({ el: document.getElementById("l-hand"), obj: hand, dy: -1.6 });
+const P = new THREE.Vector3();
+function place(el, world, dyWorld) {
+  P.copy(world); P.y += dyWorld;
+  P.project(camera);
+  el.style.left = ((P.x * 0.5 + 0.5) * innerWidth) + "px";
+  el.style.top = ((-P.y * 0.5 + 0.5) * innerHeight) + "px";
+}
+function updateLabels() {
+  GX.forEach((x, i) => place(labels[i].el, x.g.group.position, labelDY[x.key]));
+  place(labels[3].el, apps.position, -8);
+  place(labels[4].el, hand.position, -8);
+  P.set(0, 0, 0).project(camera);
+  vEl.style.left = ((P.x * 0.5 + 0.5) * innerWidth) + "px";
+  vEl.style.top = ((-P.y * 0.5 + 0.5) * innerHeight) + "px";
+  vEl.style.transform = "translate(-50%,-50%)";
+}
+
+/* ---- 視差 + ホバー ---- */
+const mouse = { x: 0, y: 0 }, ndc = new THREE.Vector2(-2, -2);
+addEventListener("pointermove", (e) => {
+  mouse.x = (e.clientX / innerWidth - 0.5) * 2;
+  mouse.y = (e.clientY / innerHeight - 0.5) * 2;
+  ndc.set(mouse.x, -mouse.y);
+});
+const ray = new THREE.Raycaster();
+let hover = null;
+function pickGalaxy() {
+  ray.setFromCamera(ndc, camera);
+  const hits = ray.intersectObjects(GX.map((x) => x.g.hit), false);
+  const found = hits.length ? GX.find((x) => x.g.hit === hits[0].object) : null;
+  if (found !== hover) {
+    hover = found;
+    canvas.style.cursor = hover ? "pointer" : "default";
+    labels.forEach((l, i) => i < 3 && l.el.classList.toggle("hot", GX[i] === hover));
+  }
+}
+canvas.addEventListener("click", () => { if (hover) location.href = hover.href; });
+vEl.addEventListener("click", () => vEl.classList.toggle("open"));
+
+/* ---- 主ループ（すべて遅い） ---- */
+const clock = new THREE.Clock();
+let swayX = 0, swayY = 0;
+function frame() {
+  const t = clock.getElapsedTime();
+  GX.forEach((x, i) => {
+    x.g.group.rotation.y += x.g.spin * 0.016;
+    x.g.group.position.y += Math.sin(t * 0.07 + i * 2.1) * 0.003;
+    const target = hover === GX[i] ? 2.3 : x.g.baseSize;
+    x.g.mat.size += (target - x.g.mat.size) * 0.06;
+  });
+  domeFar.rotation.y = t * 0.0032;
+  domeNear.rotation.y = -t * 0.0021;
+  nebulae.children.forEach((s, i) => { s.material.rotation = t * 0.004 * (i % 2 ? 1 : -1); });
+
+  const pulse = 0.5 + 0.5 * Math.sin((t / 7) * Math.PI * 2);
+  rim.material.opacity = 0.42 + pulse * 0.24;
+  halo.material.opacity = 0.08 + pulse * 0.07;
+  ringFace.material.opacity = 0.7 + pulse * 0.3;
+  const s = 1 + pulse * 0.045;
+  ringFace.scale.set(s, s, s);
+  ringFace.rotation.z = t * 0.03;
+  ringDisc.rotation.z = -t * 0.02;
+
+  swayX += ((mouse.x * 9 + Math.sin(t * 0.05) * 5) - swayX) * 0.025;
+  swayY += ((-mouse.y * 6 + Math.sin(t * 0.037) * 3) - swayY) * 0.025;
+  camera.position.x = swayX;
+  camera.position.y = (portrait ? -4 : 6) + swayY;
+  camera.lookAt(0, 0, 0);
+
+  pickGalaxy();
+  composer.render();
+  updateLabels();
+  if (!REDUCED) requestAnimationFrame(frame);
+}
+frame();
+if (REDUCED) { composer.render(); updateLabels(); } /* 静止した一枚の宇宙 */
+</script>
+
+</body>
+</html>

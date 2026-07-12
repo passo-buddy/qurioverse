@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>交信 — Qurioverse</title>
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="30" fill="%23060409" stroke="%23f2ca6b" stroke-width="7"/></svg>'>
+<link rel="stylesheet" href="../assets/tokens.css">
+<style>
+  fieldset { border: 0; padding: 0; margin: 0 0 32px; }
+  legend { font-family: var(--serif); font-size: 15px; letter-spacing: 0.16em; margin-bottom: 16px; }
+  .kinds { display: flex; flex-wrap: wrap; gap: 12px; }
+  .kinds label {
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 7px 20px; font-size: 13.5px; letter-spacing: 0.08em;
+    cursor: pointer; color: var(--muted);
+    transition: color var(--hover) ease, border-color var(--hover) ease;
+  }
+  .kinds input { position: absolute; opacity: 0; pointer-events: none; }
+  .kinds label:hover { color: var(--milk); }
+  .kinds label:has(input:checked) { color: var(--gold); border-color: var(--gold-dim); }
+  textarea {
+    width: 100%; min-height: 150px; resize: vertical;
+    background: rgba(236, 227, 208, 0.03); color: var(--milk);
+    border: 1px solid var(--line); border-radius: 10px;
+    padding: 16px 18px; font-family: var(--sans); font-size: 14.5px; line-height: 1.9;
+  }
+  textarea:focus { outline: none; border-color: var(--gold-dim); }
+  button {
+    margin-top: 28px; cursor: pointer;
+    background: none; color: var(--gold);
+    border: 1px solid var(--gold-dim); border-radius: 999px;
+    padding: 12px 40px; font-size: 14px; letter-spacing: 0.2em; font-family: var(--serif);
+    transition: box-shadow var(--hover) ease;
+  }
+  button:hover, button:focus-visible { box-shadow: 0 0 30px rgba(242, 202, 107, 0.18); }
+</style>
+</head>
+<body>
+<main class="page">
+  <a class="back" href="../">↩ 宇宙に戻る — Universe</a>
+
+  <h1>交信</h1>
+  <span class="en">Contact / ご依頼</span>
+
+  <p>この宇宙のどこかに共鳴したら、信号を送ってください。
+  対談・取材・登壇・コラボ——形は何でも。届いた信号には観測者が直接応答します。</p>
+
+  <form id="signal" style="margin-top:56px;">
+    <fieldset>
+      <legend>信号の種類</legend>
+      <div class="kinds">
+        <label><input type="radio" name="kind" value="対談" checked>対談</label>
+        <label><input type="radio" name="kind" value="取材">取材</label>
+        <label><input type="radio" name="kind" value="登壇">登壇</label>
+        <label><input type="radio" name="kind" value="コラボ">コラボ</label>
+        <label><input type="radio" name="kind" value="その他の共鳴">その他の共鳴</label>
+      </div>
+    </fieldset>
+    <textarea name="body" placeholder="信号の内容——どの星に共鳴したか、何を一緒にしたいか。"></textarea>
+    <div style="text-align:center;">
+      <button type="submit">信号を送る — Send Signal</button>
+    </div>
+    <p class="dim" style="text-align:center; margin-top:18px;">送信ボタンでメールが開きます。</p>
+  </form>
+
+  <nav class="navline" aria-label="航法">
+    <a href="../">宇宙 — Universe</a>
+    <a href="../about/">観測者について — About</a>
+    <a href="../fuel/">燃料補給 — Support</a>
+  </nav>
+</main>
+<script>
+  /* 静的サイトの v1: メール委譲（バックエンドなし）。アドレスは組み立て式。 */
+  document.getElementById("signal").addEventListener("submit", (e) => {
+    e.preventDefault();
+    const kind = new FormData(e.target).get("kind");
+    const body = new FormData(e.target).get("body") || "";
+    const to = ["passo8744", "gmail.com"].join("@");
+    location.href = "mailto:" + to
+      + "?subject=" + encodeURIComponent("[Qurioverse 交信] " + kind)
+      + "&body=" + encodeURIComponent(body);
+  });
+</script>
+<script src="../assets/starfield.js"></script>
+</body>
+</html>
