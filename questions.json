@@ -1,0 +1,20 @@
+{
+  "_note": "『今日の問い』のキュー。サンプル（実装先行用のプレースホルダ）— 人間が起案した実キューに差し替える。差し替えは text/theme/parent を書き換えるだけ（index.html は無改変）。schema: {id, text, kind:'comet'|'meteor', theme?, parent?, age?}。comet=自分の問い（周回する彗星）/ meteor=子どもの問い（一瞬流れる流れ星・同 theme もしくは同 parent は同じ放射点＝流星群）。子どもの問いは本人特定情報なし（本文と、出すなら当時の歳のみ）。公開表示は人間モデレーション後のみ（fail-closed）。",
+  "questions": [
+    { "id": "c1", "kind": "comet", "theme": "chi",    "text": "なぜ、わかった気になった瞬間に、興味は冷めるのだろう。" },
+    { "id": "c2", "kind": "comet", "theme": "chi",    "text": "問いは、答えより長く生きる。それはなぜか。" },
+    { "id": "c3", "kind": "comet", "theme": "sekai",  "text": "理解とは、世界を粗くすることか、細かくすることか。" },
+    { "id": "c4", "kind": "comet", "theme": "chi",    "text": "わからなさは、放っておくと自分で形を変えていく。" },
+    { "id": "c5", "kind": "comet", "theme": "sekai",  "text": "なぜ人は、役に立たない問いにいちばん惹かれるのか。" },
+    { "id": "c6", "kind": "comet", "theme": "kokoro", "text": "知能とは、隙間を埋めようとする動きそのものではないか。" },
+
+    { "id": "m1", "kind": "meteor", "theme": "sora",   "age": 5, "text": "そらは、どこでおわるの？" },
+    { "id": "m2", "kind": "meteor", "theme": "sora",   "age": 4, "text": "くもは、どうしておちてこないの？" },
+    { "id": "m3", "kind": "meteor", "theme": "sora",   "age": 6, "text": "ほしは、ひるまどこにいってるの？" },
+    { "id": "m4", "kind": "meteor", "theme": "inochi", "age": 5, "text": "むしにも、なまえがあるのを、むしはしってる？" },
+    { "id": "m5", "kind": "meteor", "theme": "inochi", "age": 6, "parent": "c6", "text": "しんだら、ゆめはみるの？" },
+    { "id": "m6", "kind": "meteor", "theme": "kazu",   "age": 7, "text": "いちばんおおきいかずの、つぎはなに？" },
+    { "id": "m7", "kind": "meteor", "theme": "kazu",   "age": 6, "text": "ゼロは、あるの？ ないの？" },
+    { "id": "m8", "kind": "meteor", "theme": "kokoro", "age": 5, "parent": "c6", "text": "かなしいって、からだのどこにあるの？" }
+  ]
+}

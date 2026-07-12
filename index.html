@@ -10,7 +10,7 @@
 <style>
   html, body { height: 100%; overflow: hidden; }
 
-  #scene { position: fixed; inset: 0; z-index: 0; }
+  #scene { position: fixed; inset: 0; z-index: 0; touch-action: none; } /* ドラッグで見渡す（タッチのスクロール/ズームを抑止） */
   #vig {
     position: fixed; inset: 0; z-index: 2; pointer-events: none;
     background: radial-gradient(ellipse 135% 100% at 50% 46%, transparent 46%, rgba(1, 2, 6, 0.72) 100%);
@@ -87,6 +87,56 @@
   .helm a:hover, .helm a:focus-visible { color: var(--gold); text-shadow: 0 0 18px rgba(242, 202, 107, 0.4); }
   .helm .en-sub { font-size: 9px; letter-spacing: 0.2em; display: block; text-align: center; opacity: 0.7; margin-top: 3px; }
 
+  /* ---- 問いの天体（彗星＝自分の問い / 流れ星＝子どもの問い） ---- */
+  /* 彗星の本文（彗星ホバー/タップで出る・3D 頭部に投影追従） */
+  #comet-label {
+    position: fixed; z-index: 5; transform: translate(-50%, -50%);
+    max-width: min(76vw, 460px); text-align: center; pointer-events: none;
+    opacity: 0; transition: opacity var(--hover) ease;
+  }
+  #comet-label.show { opacity: 1; }
+  #comet-label .q {
+    margin: 0; font-family: var(--serif); font-size: 15px; line-height: 1.75;
+    letter-spacing: 0.1em; color: var(--gold);
+    text-shadow: 0 0 22px rgba(242, 202, 107, 0.5), 0 2px 20px rgba(0, 0, 0, 0.85);
+  }
+  #comet-label .tag {
+    display: block; margin-top: 6px; font-size: 9px; letter-spacing: 0.28em;
+    color: var(--muted); text-transform: uppercase;
+  }
+  /* 流れ星がひとこと残す短いキャプション（頭部に追従して現れて消える） */
+  .meteor-cap {
+    position: fixed; z-index: 5; transform: translate(-50%, -50%);
+    text-align: center; pointer-events: none; opacity: 0; white-space: nowrap;
+  }
+  .meteor-cap .q {
+    margin: 0; font-family: var(--serif); font-size: 13px; letter-spacing: 0.08em;
+    color: var(--milk); text-shadow: 0 0 18px rgba(159, 232, 220, 0.4), 0 2px 16px rgba(0, 0, 0, 0.8);
+  }
+  .meteor-cap .tag { font-size: 8.5px; letter-spacing: 0.24em; color: var(--muted); }
+
+  /* 今日の問い（静的） — 通常時は SR 専用・reduced-motion では可視パネル */
+  #sky-questions {
+    position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    #sky-questions {
+      position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%);
+      z-index: 6; width: auto; height: auto; max-width: min(84vw, 520px);
+      padding: 0; margin: 0; clip: auto; white-space: normal; overflow: visible;
+      text-align: center; pointer-events: none;
+    }
+    #sky-questions .sq-comet {
+      margin: 0 0 22px; font-family: var(--serif); font-size: 16px; line-height: 1.8;
+      letter-spacing: 0.1em; color: var(--gold); text-shadow: 0 0 22px rgba(242, 202, 107, 0.4);
+    }
+    #sky-questions .sq-meteor {
+      margin: 6px 0; font-family: var(--serif); font-size: 13px; letter-spacing: 0.06em; color: var(--milk); opacity: 0.9;
+    }
+    #sky-questions .sq-head { font-size: 9px; letter-spacing: 0.3em; color: var(--muted); text-transform: uppercase; margin: 0 0 14px; }
+  }
+
   @media (max-width: 720px) {
     .helm { gap: 26px; }
     .masthead h1 { font-size: 19px; }
@@ -94,6 +144,7 @@
     .void-q { font-size: 15px; }
     #void { width: 170px; height: 170px; }
     .void-sub { bottom: -10px; }
+    #comet-label .q { font-size: 13.5px; }
   }
 </style>
 </head>
@@ -132,6 +183,11 @@
   <a href="contact/">交信<span class="en-sub">Contact / ご依頼</span></a>
   <a href="fuel/">燃料補給<span class="en-sub">Support</span></a>
 </nav>
+
+<!-- 今日の問い（彗星/流れ星）の本文オーバーレイ。JS がソースから充填 -->
+<div id="comet-label" role="note" aria-hidden="true"><p class="q"></p><span class="tag"></span></div>
+<!-- 今日の問い（静的）。通常は SR 専用・reduced-motion では可視。JS が充填 -->
+<section id="sky-questions" aria-label="今日の問い"></section>
 
 <script type="importmap">
 {"imports":{
@@ -234,29 +290,16 @@ const nebulae = new THREE.Group();
 });
 scene.add(nebulae);
 
-/* ---- 中心の空隙 — 滲む暗がり + 金の環（日蝕の光冠） ---- */
-function darkTex() {
-  const c = document.createElement("canvas"); c.width = c.height = 256;
-  const g = c.getContext("2d");
-  const gr = g.createRadialGradient(128, 128, 0, 128, 128, 128);
-  gr.addColorStop(0, "rgba(2,1,4,1)");
-  gr.addColorStop(0.55, "rgba(2,1,4,1)");
-  gr.addColorStop(0.72, "rgba(2,1,4,0.55)");
-  gr.addColorStop(0.88, "rgba(2,1,4,0.18)");
-  gr.addColorStop(1, "rgba(2,1,4,0)");
-  g.fillStyle = gr; g.fillRect(0, 0, 256, 256);
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
+/* ---- 中心の空隙 — 黒い球体（実体のある問い）+ 金の環（日蝕の光冠・降着円盤） ---- */
 const voidG = new THREE.Group();
-const core = new THREE.Sprite(new THREE.SpriteMaterial({   // 硬い球でなく、縁の滲む暗がり
-  map: darkTex(), transparent: true, depthWrite: false, fog: false,
-}));
-core.scale.set(34, 34, 1);
-const rim = sprite(TEX.warm, GOLD, 27, 0.5);          // 核の背後の光冠（環の外へ滲む）
+const core = new THREE.Mesh(                          // 黒い球体＝覗き込めない問いそのもの
+  new THREE.SphereGeometry(10.8, 48, 48),
+  new THREE.MeshBasicMaterial({ color: 0x04030c })   // 不透明: depthWrite で星野を遮り、環は球の裏へ回る
+);
+const rim = sprite(TEX.warm, GOLD, 27, 0.5);          // 球の縁から漏れる光冠（背後に沈む）
 const halo = sprite(TEX.warm, GOLD, 72, 0.09);        // 外側の淡い暈
-const ringFace = new THREE.Mesh(                      // 正面の細い環
-  new THREE.TorusGeometry(11.6, 0.13, 12, 220),
+const ringFace = new THREE.Mesh(                      // 正面の細い環（球より少し大きく＝縁から覗く）
+  new THREE.TorusGeometry(12.4, 0.13, 12, 220),
   new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false })
 );
 ringFace.rotation.x = 0.22;
@@ -265,9 +308,9 @@ const ringDisc = new THREE.Mesh(                      // 降着円盤ぎみの�
   new THREE.MeshBasicMaterial({ color: GOLD, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false })
 );
 ringDisc.rotation.x = 1.28; ringDisc.rotation.y = 0.3;
-rim.renderOrder = 1; halo.renderOrder = 1; core.renderOrder = 2; // 暗がりは光冠の上・環の下
+rim.renderOrder = 1; halo.renderOrder = 1;            // 球は不透明パスで先に描画→環/光冠は深度で球の裏へ回る
 ringFace.renderOrder = 3; ringDisc.renderOrder = 3;
-voidG.add(rim, halo, core, ringFace, ringDisc);
+voidG.add(core, rim, halo, ringFace, ringDisc);
 scene.add(voidG);
 
 /* ---- 渦巻銀河（腕の本数は実データと同じ） ---- */
@@ -322,6 +365,11 @@ scene.add(apps, hand);
 
 /* ---- レイアウト（横空/縦空で星の配置・縮尺・ラベルの逃がし方を変える） ---- */
 let portrait = false;
+/* ---- 見渡しカメラ: 空隙（原点）を軸にした制約付き slow orbit ---- */
+let camR = 132, camBaseY = 6;                          // 球面上のカメラ距離・基準高さ（layout で設定）
+const YAW_MAX = 0.66, PITCH_MAX = 0.34;                // 見渡せる範囲（迷子を作らない制約 ≈ ±38°/±19°。pitch は下部航法とラベル衝突を避け控えめ）
+let targetYaw = 0, targetPitch = 0, curYaw = 0, curPitch = 0;
+const clampN = (v, m) => (v < -m ? -m : v > m ? m : v);
 const labelDY = { kenkyu: -40, kotoba: -32, koe: -24 }; // ラベルの世界座標オフセット（負=下）
 function layout() {
   portrait = innerWidth / innerHeight < 0.9;
@@ -333,13 +381,13 @@ function layout() {
     GX[2].g.group.position.set(47, -25, 4);
     apps.position.set(-30, -46, 2);
     hand.position.set(94, -14, -26);
-    camera.position.set(0, 6, 132);
+    camR = 132; camBaseY = 6;
     labelDY.kenkyu = -40; labelDY.kotoba = -32; labelDY.koe = -24;
   } else {
     GX[0].g.group.position.set(8, 58, -16);
     GX[1].g.group.position.set(-14, -44, -6);
     GX[2].g.group.position.set(24, -88, 2);
-    camera.position.set(0, -4, 230);
+    camR = 230; camBaseY = -4;
     labelDY.kenkyu = -26; labelDY.kotoba = -22; labelDY.koe = 15; // 声だけ上に逃がす（航法と衝突しない）
   }
   apps.visible = hand.visible = !portrait;
@@ -366,14 +414,18 @@ const labels = GX.map((x) => ({ el: document.getElementById(x.label), obj: x.g.g
 labels.push({ el: document.getElementById("l-apps"), obj: apps, dy: -1.6 });
 labels.push({ el: document.getElementById("l-hand"), obj: hand, dy: -1.6 });
 const P = new THREE.Vector3();
-function place(el, world, dyWorld) {
+function place(el, world, dyWorld, guardBottom) {
   P.copy(world); P.y += dyWorld;
   P.project(camera);
-  el.style.left = ((P.x * 0.5 + 0.5) * innerWidth) + "px";
-  el.style.top = ((-P.y * 0.5 + 0.5) * innerHeight) + "px";
+  const px = (P.x * 0.5 + 0.5) * innerWidth, py = (-P.y * 0.5 + 0.5) * innerHeight;
+  // 背後/画面外は隠す（見渡し中の裏返り防止）＋銀河ラベルは下部航法ゾーンに入ったら隠す（衝突回避）
+  const off = P.z > 1 || Math.abs(P.x) > 1.25 || Math.abs(P.y) > 1.25 || (guardBottom && py > innerHeight - 64);
+  el.style.visibility = off ? "hidden" : "visible";
+  el.style.left = px + "px";
+  el.style.top = py + "px";
 }
 function updateLabels() {
-  GX.forEach((x, i) => place(labels[i].el, x.g.group.position, labelDY[x.key]));
+  GX.forEach((x, i) => place(labels[i].el, x.g.group.position, labelDY[x.key], true));
   place(labels[3].el, apps.position, -8);
   place(labels[4].el, hand.position, -8);
   P.set(0, 0, 0).project(camera);
@@ -382,12 +434,38 @@ function updateLabels() {
   vEl.style.transform = "translate(-50%,-50%)";
 }
 
-/* ---- 視差 + ホバー ---- */
+/* ---- 見渡し（ドラッグ/矢印キー）+ ホバー ---- */
 const mouse = { x: 0, y: 0 }, ndc = new THREE.Vector2(-2, -2);
+let dragging = false, dragMoved = false, lastX = 0, lastY = 0, downX = 0, downY = 0;
+const DRAG_SENS = 0.0022;
+addEventListener("pointerdown", (e) => {   // リンク（銀河ラベル/航法）上以外はどこを掴んでも見渡せる（空隙の上も可）
+  if (e.target.closest && e.target.closest("a")) return;
+  dragging = true; dragMoved = false; lastX = downX = e.clientX; lastY = downY = e.clientY;
+});
+addEventListener("pointerup", () => { dragging = false; });
 addEventListener("pointermove", (e) => {
   mouse.x = (e.clientX / innerWidth - 0.5) * 2;
   mouse.y = (e.clientY / innerHeight - 0.5) * 2;
   ndc.set(mouse.x, -mouse.y);
+  if (dragging && !REDUCED) {
+    const dx = e.clientX - lastX, dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    if (Math.abs(e.clientX - downX) + Math.abs(e.clientY - downY) > 6) dragMoved = true;
+    if (dragMoved) {   // 空隙を掴んで引く: 右ドラッグ→左を見る / 下ドラッグ→上を見る
+      targetYaw = clampN(targetYaw - dx * DRAG_SENS, YAW_MAX);
+      targetPitch = clampN(targetPitch + dy * DRAG_SENS, PITCH_MAX);
+    }
+  }
+});
+addEventListener("keydown", (e) => {   // 矢印キーで見渡す（look モデル: 右→右を見る）
+  if (REDUCED) return;
+  const st = 0.08;
+  if (e.key === "ArrowLeft") targetYaw = clampN(targetYaw - st, YAW_MAX);
+  else if (e.key === "ArrowRight") targetYaw = clampN(targetYaw + st, YAW_MAX);
+  else if (e.key === "ArrowUp") targetPitch = clampN(targetPitch + st, PITCH_MAX);
+  else if (e.key === "ArrowDown") targetPitch = clampN(targetPitch - st, PITCH_MAX);
+  else return;
+  e.preventDefault();
 });
 const ray = new THREE.Raycaster();
 let hover = null;
@@ -401,12 +479,12 @@ function pickGalaxy() {
     labels.forEach((l, i) => i < 3 && l.el.classList.toggle("hot", GX[i] === hover));
   }
 }
-canvas.addEventListener("click", () => { if (hover) location.href = hover.href; });
-vEl.addEventListener("click", () => vEl.classList.toggle("open"));
+canvas.addEventListener("click", () => { if (dragMoved) return; if (hover) location.href = hover.href; });
+vEl.addEventListener("click", () => { if (dragMoved) return; vEl.classList.toggle("open"); targetYaw = 0; targetPitch = 0; }); // 空隙クリック=家に戻る（再センタリング。ドラッグは除外）
 
 /* ---- 主ループ（すべて遅い） ---- */
 const clock = new THREE.Clock();
-let swayX = 0, swayY = 0;
+let questSys = null; // 今日の彗星/流れ星（ソース読込後に構築）
 function frame() {
   const t = clock.getElapsedTime();
   GX.forEach((x, i) => {
@@ -428,19 +506,195 @@ function frame() {
   ringFace.rotation.z = t * 0.03;
   ringDisc.rotation.z = -t * 0.02;
 
-  swayX += ((mouse.x * 9 + Math.sin(t * 0.05) * 5) - swayX) * 0.025;
-  swayY += ((-mouse.y * 6 + Math.sin(t * 0.037) * 3) - swayY) * 0.025;
-  camera.position.x = swayX;
-  camera.position.y = (portrait ? -4 : 6) + swayY;
+  // 空隙を軸にした見渡し（目標へ緩く追従・アイドル時は微ドリフトで息づく）
+  curYaw += (targetYaw - curYaw) * 0.045;
+  curPitch += (targetPitch - curPitch) * 0.045;
+  const yaw = curYaw + Math.sin(t * 0.05) * 0.02;
+  const pitch = curPitch + Math.sin(t * 0.037) * 0.013;
+  const cp = Math.cos(pitch);
+  camera.position.set(camR * Math.sin(yaw) * cp, camBaseY + camR * Math.sin(pitch), camR * Math.cos(yaw) * cp);
   camera.lookAt(0, 0, 0);
 
   pickGalaxy();
+  if (questSys) questSys.update(t);
   composer.render();
   updateLabels();
   if (!REDUCED) requestAnimationFrame(frame);
 }
 frame();
 if (REDUCED) { composer.render(); updateLabels(); } /* 静止した一枚の宇宙 */
+
+/* ============================================================
+   今日の彗星（自分の問い）/ 流れ星（子どもの問い）
+   - 選定は日付ハッシュの決定論: 同じ日は誰が見ても同じ問いに出会う
+   - 描画語彙は宇宙本体と同じ（加算スプライト・固定シード・遅い動き）
+   - 同 theme / 同 parent の流れ星は同じ放射点から流れる（流星群）
+   - prefers-reduced-motion では #sky-questions に静的表示（フェッチ不達でも宇宙は壊れない=fail-open）
+   ============================================================ */
+function hashStr(s) { let h = 2166136261 >>> 0; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; }
+
+function buildQuestions(all) {
+  const comets = all.filter((q) => q.kind === "comet" && q.text);
+  const meteors = all.filter((q) => q.kind === "meteor" && q.text);
+  const d = new Date();
+  const dateKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  const daySeed = hashStr(dateKey);
+
+  // 今日の彗星（1本・決定論）
+  const comet = comets.length ? comets[daySeed % comets.length] : null;
+  // 今日の流星群（決定論シャッフルで最大4本）
+  const order = meteors.map((q, i) => ({ q, k: mulberry32(daySeed ^ hashStr(q.id))() })).sort((a, b) => a.k - b.k);
+  const shower = order.slice(0, Math.min(4, order.length)).map((o) => o.q);
+
+  // --- 静的表示（SR 常時 + reduced-motion 可視） ---
+  const box = document.getElementById("sky-questions");
+  let html = '<p class="sq-head">今日の問い</p>';
+  if (comet) html += `<p class="sq-comet">☄ ${comet.text}</p>`;
+  shower.forEach((m) => { html += `<p class="sq-meteor">★ ${m.text}${m.age ? `<span class="tag"> — ${m.age}歳のころ</span>` : ""}</p>`; });
+  box.innerHTML = html;
+
+  if (REDUCED) return null; // 静止した宇宙は静的表示のみ
+
+  // --- 放射点（同 theme / 同 parent は共有） ---
+  const radiantCache = {};
+  function radiantFor(q) {
+    const key = "rad:" + (q.parent || q.theme || q.id);
+    if (radiantCache[key]) return radiantCache[key];
+    const r = mulberry32(hashStr(key));
+    const ang = r() * Math.PI * 2;
+    const rad = 34 + r() * 30;                    // 視野中央付近の放射点（xz 半径）
+    const v = new THREE.Vector3(Math.cos(ang) * rad, 16 + r() * 26, 40 + r() * 18); // y は視野上部（16-42）
+    radiantCache[key] = v; return v;
+  }
+
+  // --- 彗星: 尾を引いて周回する（周期 ~82s・固定シードの軌道） ---
+  const cometHead = comet ? sprite(TEX.warm, 0xfff0d4, 6.4, 0.95) : null;
+  const cometTail = [];
+  const TAIL_N = 16;
+  if (comet) {
+    scene.add(cometHead);
+    for (let i = 0; i < TAIL_N; i++) {
+      const f = i / TAIL_N;
+      const s = sprite(TEX.warm, 0xffe6b8, 5.4 * (1 - f * 0.82), 0.5 * (1 - f));
+      s.renderOrder = 0; cometTail.push(s); scene.add(s);
+    }
+    cometHead.renderOrder = 1;
+  }
+  const cometHit = new THREE.Mesh(new THREE.SphereGeometry(8, 10, 10), new THREE.MeshBasicMaterial({ visible: false }));
+  if (comet) scene.add(cometHit);
+  const cometSeed = mulberry32(daySeed ^ 0x9e3779b9);
+  // 軌道は視野中央寄り（水平に横断し左右へ抜ける・上下は視野内に収める）
+  const cOrbit = { ax: 74 + cometSeed() * 22, ay: 12 + cometSeed() * 10, oy: 6 + cometSeed() * 10, z: 40 + cometSeed() * 18, ph: cometSeed() * Math.PI * 2, tilt: (cometSeed() - 0.5) * 0.45 };
+  const history = [];
+  const cLabel = document.getElementById("comet-label");
+  if (comet) { cLabel.querySelector(".q").textContent = comet.text; cLabel.querySelector(".tag").textContent = "今日の彗星 · 自分の問い"; }
+  let cometPinned = false;
+  const rayC = new THREE.Raycaster();
+  const headPos = new THREE.Vector3();
+  const projV = new THREE.Vector3();
+
+  function cometWorld(t) {
+    const a = t * (Math.PI * 2 / 82) + cOrbit.ph;      // 82 秒周期
+    const x = Math.cos(a) * cOrbit.ax;
+    const y = cOrbit.oy + Math.sin(a * 0.5) * cOrbit.ay + Math.sin(a) * cOrbit.tilt * 10;
+    const z = cOrbit.z + Math.sin(a * 0.5 + 1.3) * 12;
+    return headPos.set(x, y, z);
+  }
+
+  // --- 流れ星プール ---
+  const meteorObjs = shower.map((q, idx) => {
+    const mr = mulberry32(daySeed ^ hashStr(q.id) ^ 0x51ed270b);
+    const head = sprite(TEX.milk, 0xdff3ee, 3.6, 0);
+    const tail = [];
+    for (let i = 0; i < 6; i++) { const s = sprite(TEX.milk, 0xcfeee6, 3.0 * (1 - i / 6), 0); tail.push(s); scene.add(s); }
+    scene.add(head);
+    const cap = document.createElement("div");
+    cap.className = "meteor-cap";
+    cap.innerHTML = `<p class="q">${q.text}</p><span class="tag">流れ星${q.age ? ` · ${q.age}歳のころ` : ""}</span>`;
+    document.body.appendChild(cap);
+    const dir = new THREE.Vector3(mr() - 0.5, -(0.35 + mr() * 0.5), mr() - 0.5).normalize();
+    return {
+      q, head, tail, cap, dir,
+      interval: 46 + mr() * 40,   // 46-86s に一度
+      offset: mr() * 80,
+      life: 2.4,                   // 尾を引いて流れる時間（長いほどゆっくり）
+      len: 58 + mr() * 26,
+      radiant: radiantFor(q),
+    };
+  });
+  const mHead = new THREE.Vector3(), mProj = new THREE.Vector3();
+
+  return {
+    update(t) {
+      // 彗星
+      if (comet) {
+        const w = cometWorld(t);
+        cometHead.position.copy(w);
+        cometHit.position.copy(w);
+        history.unshift(w.clone());
+        if (history.length > TAIL_N + 2) history.pop();
+        for (let i = 0; i < TAIL_N; i++) { const h = history[Math.min(i + 1, history.length - 1)]; if (h) cometTail[i].position.copy(h); }
+        // ホバー判定（彗星）
+        rayC.setFromCamera(ndc, camera);
+        const hit = rayC.intersectObject(cometHit, false).length > 0;
+        const shown = hit || cometPinned;
+        cLabel.classList.toggle("show", shown);
+        cLabel.setAttribute("aria-hidden", shown ? "false" : "true");
+        if (hit) canvas.style.cursor = "help";
+        if (shown) {
+          projV.copy(w); projV.y += 8; projV.project(camera);
+          cLabel.style.left = ((projV.x * 0.5 + 0.5) * innerWidth) + "px";
+          cLabel.style.top = ((-projV.y * 0.5 + 0.5) * innerHeight) + "px";
+        }
+        cometSysHit = hit; // クリック判定用に共有
+      }
+      // 流れ星
+      meteorObjs.forEach((m) => {
+        const ph = ((t + m.offset) % m.interval) / m.life; // >1 なら休止中
+        const active = ph <= 1;
+        let opa = 0;
+        if (active) {
+          opa = Math.sin(ph * Math.PI); // 立ち上がり→消え
+          mHead.copy(m.radiant).addScaledVector(m.dir, ph * m.len);
+          m.head.position.copy(mHead);
+          m.head.material.opacity = opa;
+          for (let i = 0; i < m.tail.length; i++) {
+            const back = (i + 1) * 0.9;
+            m.tail[i].position.copy(m.radiant).addScaledVector(m.dir, Math.max(0, ph * m.len - back));
+            m.tail[i].material.opacity = opa * (1 - i / m.tail.length) * 0.7;
+          }
+          mProj.copy(mHead); mProj.project(camera);
+          const vis = mProj.z < 1;
+          m.cap.style.opacity = vis ? (opa * 0.95).toFixed(3) : 0;
+          if (vis) {
+            m.cap.style.left = ((mProj.x * 0.5 + 0.5) * innerWidth) + "px";
+            m.cap.style.top = ((-mProj.y * 0.5 + 0.5) * innerHeight - 26) + "px";
+          }
+        } else {
+          m.head.material.opacity = 0; m.tail.forEach((s) => s.material.opacity = 0); m.cap.style.opacity = 0;
+        }
+      });
+    },
+    togglePin() { cometPinned = !cometPinned; return cometPinned; },
+    hovered() { return cometSysHit; },
+  };
+}
+
+let cometSysHit = false; // 彗星ホバー状態（クリックでピン留め用・update が毎フレーム更新）
+// 彗星のタップ/クリックで本文をピン留め（タッチでも読める）
+canvas.addEventListener("click", () => {
+  if (dragMoved) return;
+  if (questSys && questSys.hovered()) questSys.togglePin();
+});
+
+fetch("questions.json", { cache: "no-cache" })
+  .then((r) => (r.ok ? r.json() : Promise.reject(new Error("questions.json " + r.status))))
+  .then((data) => {
+    const all = Array.isArray(data) ? data : (data && data.questions) || [];
+    if (!all.length) return;
+    questSys = buildQuestions(all);
+  })
+  .catch(() => { /* fail-open: 問いが無くても宇宙は壊れない */ });
 </script>
 
 </body>
