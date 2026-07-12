@@ -9,3 +9,4 @@
 - **研究の銀河（kenkyu）の HTML は gitignore** — publish フラグ整備（fail-closed）まで commit しない
 - **デプロイ（Pages 有効化・ドメイン設定）は人間承認**（R5）。repo = github.com/passo-buddy/qurioverse
 - 検証: `python3 -m http.server` で 入口→各銀河→宇宙に戻る の導線 + トークン一貫を目視（V-4/V-5）
+- **ローカル専用ブランチ（local-full 等）は push しない**（公開は master のみ）
