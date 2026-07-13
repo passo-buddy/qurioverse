@@ -20,10 +20,19 @@ def fetch(url):
     return urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=20).read().decode("utf-8", "ignore")
 
 def resolve_channel_id(handle):
-    h = fetch("https://www.youtube.com/" + handle)
-    m = re.search(r'"(?:channelId|externalId)":"(UC[0-9A-Za-z_-]{22})"', h) or \
-        re.search(r'youtube\.com/channel/(UC[0-9A-Za-z_-]{22})', h)
-    return m.group(1) if m else None
+    # /videos ページの canonical/og:url/externalId から取得する。
+    # 素の "channelId" はページ内のおすすめ等の別チャンネルを先に拾うため使わない
+    # （@handle のトップに出るおすすめ動画チャンネルを誤取得したバグの修正）。
+    h = fetch("https://www.youtube.com/" + handle + "/videos")
+    for pat in (
+        r'<link rel="canonical" href="https://www\.youtube\.com/channel/(UC[0-9A-Za-z_-]{22})"',
+        r'<meta property="og:url" content="https://www\.youtube\.com/channel/(UC[0-9A-Za-z_-]{22})"',
+        r'"externalId":"(UC[0-9A-Za-z_-]{22})"',
+    ):
+        m = re.search(pat, h)
+        if m:
+            return m.group(1)
+    return None
 
 def yt_works(cid, limit=15):
     xml = fetch("https://www.youtube.com/feeds/videos.xml?channel_id=" + cid)
