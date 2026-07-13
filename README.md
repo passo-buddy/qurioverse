@@ -1,23 +1,39 @@
 # Qurioverse — 好奇心の宇宙
 
-全表現活動（研究・ことば・声・作品・手仕事）をひとつの宇宙として公開する静的サイト。
-サイト＝宇宙 / 作品＝星 / 媒体＝銀河 / 思想＝銀河の裏面。中心には答えのない問いが空いている。
+全表現活動（研究・ことば・声・発見・作品）をひとつの宇宙として公開する静的サイト。
+**サイト＝宇宙 / 作品＝星 / 媒体＝銀河 / 思想＝銀河の裏面（曼荼羅）**。
+中心には答えのない問いが空いている。ビルドなし・素の HTML/CSS/JS、外部依存は three.js のみ。
 
-- 設計正本: `~/nexus-home/ideas/explorations/2026-07-12-expression-universe-site-design.md`
-- 銀河の生成エンジン: `~/src/galaxy-forge/`（forge 相=1回だけAI / run 相=純決定論）
+→ **https://qurioverse.com**
+
+## この宇宙の読み方
+
+- **入口＝宇宙** — 中心の空隙（黒い核＋降着円盤）のまわりを銀河が公転。ドラッグ／矢印キーで見渡す（制約付き slow orbit）。各銀河をクリックで「降下」。
+- **銀河＝媒体** — 渦巻銀河。腕＝テーマ・星＝作品・輝度＝反応（共鳴）。
+- **表裏フリップ（署名的操作）** — 銀河は「❋ 裏面へ」で **曼荼羅（思想の面）** に裏返る。作った物 ⇄ その底で考えていること。全銀河で同じ操作＝同じ意味（声の銀河から順次導入）。
+- **発見の星座** — 渦巻でなく星座（点を線で結ぶ＝思考の配線）。「時をまわす」で配線が生まれた順に引かれる。
+- **作品の星団** — Instagram × YouTube を隣り合う二重星団に（線のない群れ＝所属）。星＝作品・輝度＝反応・クリックで作品へ。
+- **生きている宇宙** — 今週生まれた星が金に灯り、彗星（自分の問い）と流れ星（子どもの問い）が夜空を横切る。
 
 ## 構成
 
 ```
-index.html            宇宙（入口）— 星野 + 中心の空隙 + 銀河カード
+index.html              宇宙（入口）— three.js の 3D シーン（空隙＋銀河＋公転）
 galaxies/
-  kenkyu/             研究の銀河（explorations）※ HTML 実体は gitignore — 下記参照
-  kotoba/             ことばの銀河（note）
-  koe/                声の銀河（観測準備中）
-about/                観測者について
-contact/              交信（Contact / ご依頼）
-fuel/                 燃料補給（Support）
-assets/tokens.css     デザイントークン（全ページ強制・唯一の共有CSS）
+  kenkyu/               研究の銀河（explorations・公開版）
+  kotoba/               ことばの銀河（note・共鳴輝度）
+  koe/                  声の銀河（podcast）⇄ 曼荼羅（表裏フリップ）
+  hakken/               発見の星座（好奇心グラフ＝思考の配線・時をまわす）
+  sakuhin/              作品の星団（Instagram × YouTube の二重星団）
+about/ contact/ fuel/   観測者について / 交信（ご依頼）/ 燃料補給（支援）
+assets/
+  tokens.css            デザイントークン（全ページ強制・唯一の共有CSS）
+  flip.css / flip.js    表裏フリップの署名機構（全銀河共有）
+  week-born.js / wb.css 今週生まれた星
+  starfield.js          サブページの背景星野
+scripts/
+  build-week-born.py    "生きている宇宙"（今週生まれた星）のデータ生成
+  collect-works.py      作品の星団データ生成（YouTube＝公式RSS / Instagram＝手動）
 ```
 
 ## ローカルで見る
@@ -27,25 +43,21 @@ cd qurioverse && python3 -m http.server 8080
 # → http://localhost:8080/
 ```
 
-## 銀河 HTML の同期（生成物のコピー元）
-
-| 銀河 | コピー元 | 配置先 |
-|---|---|---|
-| ことば | `~/nexus-home/knowledge/note-galaxy/visualize/note-galaxy.html` | `galaxies/kotoba/` |
-| 研究 | `~/nexus-home/knowledge/explorations-galaxy/visualize/explorations-galaxy.html` | `galaxies/kenkyu/` |
-
-**研究の銀河の HTML は git 管理外（.gitignore）**。研究ノートには非公開情報がありえるため、
-frontmatter `publish:` フラグ（既定 private の fail-closed）による公開版ビルドが整うまで
-コミットしない（git 履歴に残さない）。ローカルでは上記コピーで導線が全通する。
+ビルド不要。唯一の外部依存は three.js@0.161.0（CDN importmap・入口と銀河で同一版を共有）。
 
 ## デザイントークン（宇宙の物理法則）
 
-- 色: 深宇宙 `#060409–#0a0806` / 金 `#f2ca6b` / 乳白 `#ece3d0` / ミュート `#9a8f76`
-- 字: 見出し=明朝 / 本文=ゴシック
-- 動き: すべて遅い（drift 60s+・pulse 7s）。速いアニメ禁止
-- 語彙: 星=作品 / 銀河=媒体 / 腕=テーマ / 空隙=未解決の問い / 交信=依頼 / 燃料=支援
+- **色**: 深宇宙 `#060409–#0a0806` / 金 `#f2ca6b` / 乳白 `#ece3d0` / ミュート `#9a8f76`（すべて `assets/tokens.css` 経由・ハードコード禁止）
+- **字**: 見出し＝明朝 / 本文＝ゴシック
+- **動き**: すべて遅い（drift 60s+・pulse 7s・fade 1.6s）。速いアニメは禁止＝宇宙の時間感覚。`prefers-reduced-motion` では静止する。
+- **語彙**: 星＝作品 / 銀河＝媒体 / 腕＝テーマ / 裏面＝思想（曼荼羅）/ 星団＝作品群 / 星座＝発見（配線）/ 空隙＝未解決の問い / 交信＝依頼 / 燃料＝支援
 
-## 公開（人間承認事項）
+## 生成物について
 
-GitHub public 化・Pages デプロイ・ドメイン取得（qurioverse.com）はすべて人間承認のうえで実施。
-週次同期（collectors → forge build → deploy）は公開後に GitHub Actions cron で構築予定（secrets 不要）。
+銀河・曼荼羅・発見の星座の HTML は**決定論エンジンの出力コピー**（生成物）。直接編集せず、エンジン側で直して再コピーする。
+研究の銀河は公開版（`publish` フラグの fail-closed フィルタで非公開ノートを除外）。
+作品の星団は `scripts/collect-works.py` で `works.json` を再生成する（YouTube＝公式RSS・Instagram＝手動）。
+
+## ライセンス
+
+`LICENSE` を参照（コード／コンテンツで区分）。
