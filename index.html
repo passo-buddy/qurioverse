@@ -184,7 +184,10 @@
   <span class="g-name">発見の星座</span>
   <span class="g-sub">Discovery · 思考の配線</span>
 </a>
-<a class="speck-label" id="l-apps" href="galaxies/sakuhin/" style="pointer-events:auto;text-decoration:none">作品の星団</a>
+<a class="glabel" id="l-apps" href="galaxies/sakuhin/">
+  <span class="g-name">作品の星団</span>
+  <span class="g-sub">Works · Instagram × YouTube</span>
+</a>
 <div class="speck-label" id="l-hand">手の星雲 · 準備中</div>
 
 <nav class="helm" aria-label="航法">
@@ -368,9 +371,23 @@ const GX = [
 ];
 GX.forEach((x) => scene.add(x.g.group));
 
-/* ---- 未観測の光点（星団・星雲の種） ---- */
-const apps = sprite(TEX.milk, MILK, 7, 0.4);
-const hand = sprite(TEX.milk, MILK, 6, 0.35);
+/* ---- 作品の星団（二重星団: Instagram × YouTube。渦巻でない"群れ"＝形は性質に従う） ---- */
+function makeCluster() {
+  const g = new THREE.Group();
+  [{ c: 0xe6a3c4, cx: -6 }, { c: 0xe8926a, cx: 6 }].forEach(({ c, cx }, ci) => {
+    const rnd = mulberry32(414 + ci * 31);
+    for (let i = 0; i < 9; i++) {
+      const a = rnd() * Math.PI * 2, ph = Math.acos(2 * rnd() - 1), r = 5 * Math.sqrt(rnd());
+      const st = sprite(TEX.warm, c, 1.6 + rnd() * 2.2, 0.6 + rnd() * 0.32);
+      st.position.set(cx + Math.sin(ph) * Math.cos(a) * r, Math.sin(ph) * Math.sin(a) * r * 0.82, Math.cos(ph) * r * 0.7);
+      g.add(st);
+    }
+    const halo = sprite(TEX.milk, c, 15, 0.05); halo.position.set(cx, 0, 0); g.add(halo); // 束縛の暈
+  });
+  return g;
+}
+const apps = makeCluster();                    // 作品の星団（二重星団）
+const hand = sprite(TEX.milk, MILK, 6, 0.35);  // 手の星雲（準備中）
 scene.add(apps, hand);
 
 /* ---- 発見の星座（源泉・核隣接。渦巻でなく"配線"の星座＝形は性質に従う） ---- */
@@ -412,7 +429,7 @@ function layout() {
     GX[0].g.group.position.set(64, 27, -32);
     GX[1].g.group.position.set(-68, 2, -18);
     GX[2].g.group.position.set(47, -25, 4);
-    apps.position.set(-30, -46, 2);
+    apps.position.set(-30, -46, 2); apps.scale.setScalar(1);
     hand.position.set(94, -14, -26);
     hakken.position.set(-32, 32, 26); hakken.scale.setScalar(1);
     camR = 132; camBaseY = 6;
@@ -422,11 +439,12 @@ function layout() {
     GX[1].g.group.position.set(-14, -44, -6);
     GX[2].g.group.position.set(24, -88, 2);
     hakken.position.set(20, 18, 16); hakken.scale.setScalar(0.7);
+    apps.position.set(-20, -14, 12); apps.scale.setScalar(0.6);
     camR = 230; camBaseY = -4;
     labelDY.kenkyu = -26; labelDY.kotoba = -22; labelDY.koe = 15; // 声だけ上に逃がす（航法と衝突しない）
   }
-  apps.visible = hand.visible = !portrait;
-  document.getElementById("l-apps").style.display = portrait ? "none" : "";
+  apps.visible = true; hand.visible = !portrait;                 // 作品の星団は縦横とも表示（アクセスルート確保）
+  document.getElementById("l-apps").style.display = "";
   document.getElementById("l-hand").style.display = portrait ? "none" : "";
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
