@@ -27,6 +27,15 @@
   .clabel{position:fixed;z-index:3;transform:translate(-50%,-50%);pointer-events:none;white-space:nowrap;
     font-size:11px;letter-spacing:.2em;color:var(--muted);opacity:.7;text-shadow:0 2px 12px rgba(0,0,0,.8)}
   .hint{position:fixed;right:18px;bottom:14px;z-index:5;font-size:10.5px;letter-spacing:.1em;color:var(--muted);opacity:.6;pointer-events:none}
+  /* 時をまわす（配線が date 順に引かれる） */
+  #timeline{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:6;display:flex;align-items:center;gap:12px;
+    padding:8px 16px;background:rgba(6,4,9,.55);border:1px solid var(--line);border-radius:999px;backdrop-filter:blur(4px);
+    font-size:11px;letter-spacing:.1em;color:var(--muted);pointer-events:auto}
+  #timeline button{background:none;border:1px solid var(--line);border-radius:999px;color:var(--gold);font-size:12px;padding:3px 12px;cursor:pointer;letter-spacing:.08em}
+  #timeline button:hover,#timeline button:focus-visible{border-color:var(--gold)}
+  #timeline input[type=range]{width:min(38vw,260px);accent-color:var(--gold);cursor:pointer}
+  #tl-date{font-family:var(--serif);color:var(--milk);min-width:92px;text-align:center}
+  @media (max-width:560px){#timeline input[type=range]{width:44vw}#tl-date{display:none}}
 </style>
 </head>
 <body>
@@ -58,6 +67,8 @@ const hsh=(s)=>{let h=2166136261>>>0;for(let i=0;i<s.length;i++){h^=s.charCodeAt
 const mul=(a)=>()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
 const BORN_WINDOW_DAYS=30; // 新しく生まれた星の窓（assets/week-born.js と揃える・7=今週/30=最近）
 function bornRecently(ds){if(!ds)return false;const d=new Date(String(ds).slice(0,10)+"T00:00:00");if(isNaN(d.getTime()))return false;const diff=(Date.now()-d.getTime())/86400000;return diff>=0&&diff<=BORN_WINDOW_DAYS;}
+const parseDateMs=(ds)=>{if(!ds)return NaN;const d=new Date(String(ds).slice(0,10)+"T00:00:00");return isNaN(d.getTime())?NaN:d.getTime();};
+const clamp01=(x)=>x<0?0:x>1?1:x; const smooth=(x)=>{x=clamp01(x);return x*x*(3-2*x);};
 
 const canvas=document.getElementById("scene");
 const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
@@ -103,15 +114,32 @@ const anaEdges=edges.filter(e=>e.type==="analogous");
  scene.add(new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:0x3a5a6a,transparent:true,opacity:0.05,blending:THREE.AdditiveBlending,depthWrite:false})));}
 // authored（配線）は直線・analogous（金の橋）は上へ弧。個別 Line 化してホバーで incident を光らせる
 const edgeObjs=[]; const edgeByNode={}; nodes.forEach(n=>edgeByNode[n.id]=[]);
-function addEdgeLine(e,color,baseOp,arc){const a=pos[e.from],b=pos[e.to];if(!a||!b)return;
-  let g; if(arc){const mid=a.clone().add(b).multiplyScalar(0.5);mid.z+=24+a.distanceTo(b)*0.18;
-    g=new THREE.BufferGeometry().setFromPoints(new THREE.QuadraticBezierCurve3(a,mid,b).getPoints(26));}
-  else g=new THREE.BufferGeometry().setFromPoints([a,b]);
+const NSEG=24; // 直線を24点に再サンプル（弧と揃え setDrawRange で"引かれる"を表現）
+function addEdgeLine(e,color,baseOp,arc){let a=pos[e.from],b=pos[e.to];if(!a||!b)return;
+  const da=parseDateMs(byId[e.from]&&byId[e.from].date), db=parseDateMs(byId[e.to]&&byId[e.to].date);
+  let from=e.from,to=e.to,edgeDate=null;
+  if(!isNaN(da)&&!isNaN(db)){ edgeDate=Math.max(da,db);
+    if(da>db){ const t=a;a=b;b=t; from=e.to;to=e.from; } }   // older→newer に整序（古い星から伸びる）
+  let pts;
+  if(arc){const mid=a.clone().add(b).multiplyScalar(0.5);mid.z+=24+a.distanceTo(b)*0.18;
+    pts=new THREE.QuadraticBezierCurve3(a,mid,b).getPoints(26);}
+  else { pts=[]; for(let i=0;i<=NSEG;i++) pts.push(a.clone().lerp(b,i/NSEG)); }
+  const g=new THREE.BufferGeometry().setFromPoints(pts); const nseg=pts.length-1; g.setDrawRange(0,nseg);
   const mat=new THREE.LineBasicMaterial({color,transparent:true,opacity:baseOp,blending:THREE.AdditiveBlending,depthWrite:false});
   scene.add(new THREE.Line(g,mat));
-  const rec={from:e.from,to:e.to,mat,baseOp,arc}; edgeObjs.push(rec); edgeByNode[e.from].push(rec); edgeByNode[e.to].push(rec);}
+  const rec={from,to,mat,baseOp,arc,edgeDate,nseg,geo:g,gatedOp:baseOp,reveal:1}; edgeObjs.push(rec); edgeByNode[from].push(rec); edgeByNode[to].push(rec);}
 authEdges.forEach(e=>addEdgeLine(e,AUTH[e.type],0.42,false));
 anaEdges.forEach(e=>addEdgeLine(e,GOLD,0.30,true));
+
+/* ---- 時をまわす: 配線が date 順に引かれる（成長＝線の長さ・純追加・fail-open） ---- */
+const _dated=edgeObjs.filter(r=>r.edgeDate!=null).map(r=>r.edgeDate);
+const pmin=_dated.length?Math.min(..._dated):0, pmax=_dated.length?Math.max(..._dated):0;
+const HAS_TL=_dated.length>0 && pmax>pmin;                 // gate 対象なし/単一日 → 建てない（base 不変）
+const PLAY_SECONDS=24, FADE_S=1.6;
+const BAND=HAS_TL?(pmax-pmin)*(FADE_S/PLAY_SECONDS):1;      // 各エッジは data span に依らず約1.6s で描かれる
+const PEND=HAS_TL?pmax+BAND:pmax;                          // 掃引終端＝最新エッジも描き終わる（pmax+BAND）
+const SPEED=HAS_TL?(PEND-pmin)/PLAY_SECONDS:0;
+let ph=PEND, playing=false, setPlayBtn=()=>{};
 
 /* ---- 星（種別グリフ・被参照で輝度/大きさ） ---- */
 const TYPE={discovery:{tex:TEX.warm,color:0xffe6b0,label:"発見"},question:{tex:TEX.cyan,color:0xbfeee6,label:"問い"},
@@ -165,8 +193,15 @@ addEventListener("pointermove",e=>{ndc.set(e.clientX/innerWidth*2-1,-(e.clientY/
     if(moved){tYaw=clamp(tYaw-dx*0.002,YMAX);tPitch=clamp(tPitch+dy*0.002,PMAX);}}});
 const spriteObjs=stars.map(s=>s.s);
 let hlEdges=[];
-function highlightEdges(id){hlEdges.forEach(r=>r.mat.opacity=r.baseOp);hlEdges=id?(edgeByNode[id]||[]):[];
-  hlEdges.forEach(r=>r.mat.opacity=Math.min(1,r.baseOp*2.4+0.4));}
+// gatedOp（時をまわすの現在値）を唯一の真実源に。未生(gatedOp 0)は hover でも露出しない（二重ガード）
+function paint(rec){const hov=hoverNode&&(rec.from===hoverNode||rec.to===hoverNode);
+  rec.mat.opacity=(rec.gatedOp<=0.001)?0:(hov?Math.min(1,rec.gatedOp*2.4+0.4):rec.gatedOp);}
+function applyPlayhead(p){for(const rec of edgeObjs){
+  const reveal=(rec.edgeDate==null)?1:smooth((p-rec.edgeDate)/BAND); // 自 date から BAND 幅で立ち上がり・以後 accretive
+  rec.reveal=reveal; rec.gatedOp=rec.baseOp*reveal; rec.geo.setDrawRange(0,Math.max(0,Math.ceil(reveal*rec.nseg))); paint(rec);}
+  const cap=document.getElementById("tl-date"); if(cap){const d=new Date(Math.min(p,pmax));cap.textContent=isNaN(d.getTime())?"":`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;}
+  const rg=document.getElementById("tl-range"); if(rg&&HAS_TL) rg.value=Math.round((p-pmin)/(PEND-pmin)*1000);}
+function highlightEdges(id){const prev=hlEdges;hlEdges=id?(edgeByNode[id]||[]):[];prev.forEach(paint);hlEdges.forEach(paint);}
 function pick(){ray.setFromCamera(ndc,camera);const hit=ray.intersectObjects(spriteObjs,false);
   const found=hit.length?stars.find(s=>s.s===hit[0].object):null;const fid=found?found.n.id:null;
   if(fid!==hoverNode){hoverNode=fid;canvas.style.cursor=fid?"help":"default";highlightEdges(fid);
@@ -196,6 +231,7 @@ function frame(){const t=clock.getElapsedTime();const dt=Math.min(0.05,t-last);l
   stars.forEach(st=>{const tw=0.82+0.18*Math.sin(t*st.tw+st.ph);const hot=hoverNode===st.n.id?1.6:(hoverNode&&adj[hoverNode].includes(st.n.id)?1.3:1);
     st.s.material.opacity=st.baseOp*tw*(hot>1?1.15:1);st.s.scale.setScalar(st.baseSz*hot);});
   bornGlows.forEach(bg=>{bg.g.material.opacity=REDUCED?0.5:(0.34+0.34*Math.sin((t/7)*Math.PI*2+bg.ph));}); // 誕生の呼吸（7s・遅い）
+  if(HAS_TL&&playing&&!REDUCED){ph+=dt*SPEED;if(ph>=PEND){ph=PEND;playing=false;setPlayBtn("▶");}applyPlayhead(ph);} // 時をまわす（playing 中のみ edge opacity を書く）
   updatePulses(dt);
   pick();composer.render();
   labels.forEach(l=>place(l.el,l.c,10));
@@ -203,6 +239,25 @@ function frame(){const t=clock.getElapsedTime();const dt=Math.min(0.05,t-last);l
   if(!REDUCED)requestAnimationFrame(frame);}
 frame();
 if(REDUCED){composer.render();labels.forEach(l=>place(l.el,l.c,10));}
+
+/* ---- 時をまわす: UI + 初期状態（HAS_TL の時だけ建てる＝base 不変な fail-open） ---- */
+if(HAS_TL){
+  const bar=document.createElement("div");bar.id="timeline";
+  bar.innerHTML='<button id="tl-play" aria-label="時をまわす">▶</button>'+
+    '<input id="tl-range" type="range" min="0" max="1000" value="1000" aria-label="時間">'+
+    '<span id="tl-date"></span><button id="tl-done">完成へ</button>';
+  document.body.appendChild(bar);
+  const playBtn=document.getElementById("tl-play"),range=document.getElementById("tl-range");
+  setPlayBtn=(s)=>{playBtn.textContent=s;};
+  ["pointerdown","pointermove","pointerup","click"].forEach(ev=>bar.addEventListener(ev,e=>e.stopPropagation())); // orbit-drag 誤爆防止
+  const renderIfReduced=()=>{if(REDUCED){composer.render();labels.forEach(l=>place(l.el,l.c,10));}};
+  playBtn.addEventListener("click",()=>{ if(REDUCED)return;
+    if(playing){playing=false;setPlayBtn("▶");} else { if(ph>=PEND)ph=pmin; playing=true;setPlayBtn("⏸"); } });
+  range.addEventListener("input",()=>{ playing=false;setPlayBtn("▶"); ph=pmin+(range.value/1000)*(PEND-pmin); applyPlayhead(ph); renderIfReduced(); });
+  document.getElementById("tl-done").addEventListener("click",()=>{ playing=false;setPlayBtn("▶"); ph=PEND; applyPlayhead(ph); renderIfReduced(); });
+  if(!REDUCED){ ph=pmin; playing=true; setPlayBtn("⏸"); applyPlayhead(ph); }   // 既定: 空から一度だけ編み上げる（accretive・ループ無し）
+  else { ph=PEND; applyPlayhead(ph); }                                          // REDUCED: 完成静止＋手動スクラバのみ
+}
 </script>
 </body>
 </html>
