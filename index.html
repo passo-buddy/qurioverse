@@ -70,6 +70,8 @@
   #l-kotoba { left: 20%; top: 46%; }
   #l-koe    { left: 68%; top: 76%; }
   #l-hakken { left: 40%; top: 30%; }
+  /* 新しく生まれた星: 該当銀河ラベルに金の marker（数字なし=気配を保つが perceptible） */
+  .glabel.born .g-name::after { content: " · 新星"; color: var(--gold); font-size: 0.7em; letter-spacing: 0.1em; opacity: 0.92; }
 
   .speck-label {
     position: fixed; z-index: 3; transform: translate(-50%, -50%); pointer-events: none;
@@ -194,6 +196,7 @@
 <!-- 今日の問い（静的）。通常は SR 専用・reduced-motion では可視。JS が充填 -->
 <section id="sky-questions" aria-label="今日の問い"></section>
 
+<script src="assets/week-born.js"></script>
 <script type="importmap">
 {"imports":{
   "three":"https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js",
@@ -517,6 +520,7 @@ vEl.addEventListener("click", () => { if (dragMoved) return; vEl.classList.toggl
 /* ---- 主ループ（すべて遅い） ---- */
 const clock = new THREE.Clock();
 let questSys = null; // 今日の彗星/流れ星（ソース読込後に構築）
+const novae = []; let bornAny = false; // 新しく生まれた星（week-born 読込後に構築）
 function frame() {
   const t = clock.getElapsedTime();
   GX.forEach((x, i) => {
@@ -530,8 +534,8 @@ function frame() {
   nebulae.children.forEach((s, i) => { s.material.rotation = t * 0.004 * (i % 2 ? 1 : -1); });
 
   const pulse = 0.5 + 0.5 * Math.sin((t / 7) * Math.PI * 2);
-  rim.material.opacity = 0.42 + pulse * 0.24;
-  halo.material.opacity = 0.08 + pulse * 0.07;
+  rim.material.opacity = 0.42 + pulse * 0.24 + (bornAny ? 0.06 : 0);   // 新星がある週は空隙をごく僅か温める
+  halo.material.opacity = 0.08 + pulse * 0.07 + (bornAny ? 0.02 : 0);
   ringFace.material.opacity = 0.7 + pulse * 0.3;
   const s = 1 + pulse * 0.045;
   ringFace.scale.set(s, s, s);
@@ -549,6 +553,8 @@ function frame() {
 
   pickGalaxy();
   if (questSys) questSys.update(t);
+  if (novae.length) { const np = 0.4 + 0.6 * (0.5 + 0.5 * Math.sin((t / 7) * Math.PI * 2)); // 誕生の呼吸（7s）
+    novae.forEach((nv) => { nv.nova.position.copy(nv.anchor).add(nv.off); nv.nova.material.opacity = REDUCED ? 0.7 : np; }); }
   composer.render();
   updateLabels();
   if (!REDUCED) requestAnimationFrame(frame);
@@ -583,7 +589,9 @@ function buildQuestions(all) {
   let html = '<p class="sq-head">今日の問い</p>';
   if (comet) html += `<p class="sq-comet">☄ ${comet.text}</p>`;
   shower.forEach((m) => { html += `<p class="sq-meteor">★ ${m.text}${m.age ? `<span class="tag"> — ${m.age}歳のころ</span>` : ""}</p>`; });
-  box.innerHTML = html;
+  let sqBody = box.querySelector("#sq-body");                 // 問いは専用サブ要素にだけ書く
+  if (!sqBody) { sqBody = document.createElement("div"); sqBody.id = "sq-body"; box.appendChild(sqBody); }
+  sqBody.innerHTML = html;                                    // week-born の born 行（box 直下の兄弟）を消さない
 
   if (REDUCED) return null; // 静止した宇宙は静的表示のみ
 
@@ -727,6 +735,41 @@ fetch("questions.json", { cache: "no-cache" })
     questSys = buildQuestions(all);
   })
   .catch(() => { /* fail-open: 問いが無くても宇宙は壊れない */ });
+
+/* ============================================================
+   新しく生まれた星（俯瞰座席）— born 銀河の近傍に新星スプライトを1つ足す
+   - week-born.json を fetch（fail-open）→ 銀河別に born 判定 → 該当銀河に追従する新星
+   - 該当銀河ラベルに金 marker「· 新星」/ 空隙をごく僅か温める / 0件週は何も足さない
+   - クリックは既存の銀河 hit に吸収（新規遷移先ゼロ＝迷子ゼロ）・reduced は静的行
+   ============================================================ */
+const GAL_NAME = { kenkyu: "研究の銀河", kotoba: "ことばの銀河", koe: "声の銀河", hakken: "発見の星座" };
+function bornAnchor(slug) {
+  if (slug === "hakken") return hakken.position;
+  const gx = GX.find((x) => x.key === slug);
+  return gx ? gx.g.group.position : null;
+}
+(window.WeekBorn ? window.WeekBorn.load("week-born.json") : Promise.resolve([]))
+  .then((items) => {
+    if (!items || !items.length) return;                 // 0件週=前週の静けさ
+    const bySlug = window.WeekBorn.byGalaxy(items);
+    Object.keys(bySlug).forEach((slug) => {
+      const anchor = bornAnchor(slug);
+      if (!anchor) return;
+      const nova = sprite(TEX.warm, 0xffe6b0, 5.4, 0); nova.renderOrder = 3; scene.add(nova);
+      novae.push({ slug, anchor, nova, off: new THREE.Vector3(7, 11, 6) });
+      const el = document.getElementById("l-" + slug); if (el) el.classList.add("born");
+    });
+    bornAny = novae.length > 0;
+    if (REDUCED) { // 静止した宇宙では 3D 新星でなく静的行で報せる
+      const box = document.getElementById("sky-questions");
+      if (box && bornAny) {
+        const names = Object.keys(bySlug).map((s) => GAL_NAME[s] || s).join("・");
+        const p = document.createElement("p"); p.className = "sq-meteor";
+        p.textContent = "✦ 新しく生まれた星: " + names; box.appendChild(p);
+      }
+    }
+  })
+  .catch(() => { /* fail-open: 週次データが無くても宇宙は壊れない */ });
 </script>
 
 </body>
