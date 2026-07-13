@@ -1,0 +1,20 @@
+{
+  "_note": "手動データ（作品の星団の Instagram クラスタ）。実際の投稿に置き換えてください。各作品 = {title, url, date(YYYY-MM-DD), engagement=いいね数, thumb(任意・画像URL)}。編集後 python3 scripts/collect-works.py で works.json を再生成。※ 現状はサンプル。",
+  "platform": "instagram",
+  "name": "Instagram",
+  "handle": "studious_thinker",
+  "url": "https://www.instagram.com/studious_thinker/",
+  "hue": "230,163,196",
+  "metric": "likes",
+  "source": "manual",
+  "works": [
+    { "title": "サンプル投稿 01", "url": "https://www.instagram.com/studious_thinker/", "date": "2026-06-28", "engagement": 312 },
+    { "title": "サンプル投稿 02", "url": "https://www.instagram.com/studious_thinker/", "date": "2026-06-12", "engagement": 88 },
+    { "title": "サンプル投稿 03", "url": "https://www.instagram.com/studious_thinker/", "date": "2026-05-30", "engagement": 205 },
+    { "title": "サンプル投稿 04", "url": "https://www.instagram.com/studious_thinker/", "date": "2026-05-18", "engagement": 47 },
+    { "title": "サンプル投稿 05", "url": "https://www.instagram.com/studious_thinker/", "date": "2026-05-02", "engagement": 156 },
+    { "title": "サンプル投稿 06", "url": "https://www.instagram.com/studious_thinker/", "date": "2026-04-20", "engagement": 274 },
+    { "title": "サンプル投稿 07", "url": "https://www.instagram.com/studious_thinker/", "date": "2026-04-05", "engagement": 63 },
+    { "title": "サンプル投稿 08", "url": "https://www.instagram.com/studious_thinker/", "date": "2026-03-22", "engagement": 119 }
+  ]
+}

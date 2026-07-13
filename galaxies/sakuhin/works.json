@@ -1,0 +1,180 @@
+{
+  "_note": "自動生成（scripts/collect-works.py）。YouTube=公式RSS（実データ・直近~15本）/ Instagram=手動（works.instagram.json を編集）。",
+  "clusters": [
+    {
+      "platform": "instagram",
+      "name": "Instagram",
+      "handle": "studious_thinker",
+      "url": "https://www.instagram.com/studious_thinker/",
+      "hue": "230,163,196",
+      "metric": "likes",
+      "source": "manual",
+      "works": [
+        {
+          "title": "サンプル投稿 01",
+          "url": "https://www.instagram.com/studious_thinker/",
+          "date": "2026-06-28",
+          "engagement": 312
+        },
+        {
+          "title": "サンプル投稿 02",
+          "url": "https://www.instagram.com/studious_thinker/",
+          "date": "2026-06-12",
+          "engagement": 88
+        },
+        {
+          "title": "サンプル投稿 03",
+          "url": "https://www.instagram.com/studious_thinker/",
+          "date": "2026-05-30",
+          "engagement": 205
+        },
+        {
+          "title": "サンプル投稿 04",
+          "url": "https://www.instagram.com/studious_thinker/",
+          "date": "2026-05-18",
+          "engagement": 47
+        },
+        {
+          "title": "サンプル投稿 05",
+          "url": "https://www.instagram.com/studious_thinker/",
+          "date": "2026-05-02",
+          "engagement": 156
+        },
+        {
+          "title": "サンプル投稿 06",
+          "url": "https://www.instagram.com/studious_thinker/",
+          "date": "2026-04-20",
+          "engagement": 274
+        },
+        {
+          "title": "サンプル投稿 07",
+          "url": "https://www.instagram.com/studious_thinker/",
+          "date": "2026-04-05",
+          "engagement": 63
+        },
+        {
+          "title": "サンプル投稿 08",
+          "url": "https://www.instagram.com/studious_thinker/",
+          "date": "2026-03-22",
+          "engagement": 119
+        }
+      ]
+    },
+    {
+      "platform": "youtube",
+      "name": "YouTube",
+      "handle": "straisingchildren6357",
+      "url": "https://www.youtube.com/@straisingchildren6357",
+      "hue": "232,146,106",
+      "metric": "views",
+      "source": "youtube-rss",
+      "works": [
+        {
+          "title": "解けたらスカッとする円の良問",
+          "url": "https://www.youtube.com/watch?v=R7n3IuZMhUg",
+          "date": "2026-07-13",
+          "engagement": 1655,
+          "thumb": "https://i.ytimg.com/vi/R7n3IuZMhUg/hqdefault.jpg"
+        },
+        {
+          "title": "正答率が低い高次方程式",
+          "url": "https://www.youtube.com/watch?v=Z0v6HjG24-M",
+          "date": "2026-07-13",
+          "engagement": 6612,
+          "thumb": "https://i.ytimg.com/vi/Z0v6HjG24-M/hqdefault.jpg"
+        },
+        {
+          "title": "方程式を使わずに解きたい正方形問題",
+          "url": "https://www.youtube.com/watch?v=qnK64_QFk_I",
+          "date": "2026-07-12",
+          "engagement": 6980,
+          "thumb": "https://i.ytimg.com/vi/qnK64_QFk_I/hqdefault.jpg"
+        },
+        {
+          "title": "あなたはどうさばく？普通のルート計算",
+          "url": "https://www.youtube.com/watch?v=Y9fU3kK88CE",
+          "date": "2026-07-12",
+          "engagement": 6334,
+          "thumb": "https://i.ytimg.com/vi/Y9fU3kK88CE/hqdefault.jpg"
+        },
+        {
+          "title": "三平方の定理を使わずに解く受験算数図形",
+          "url": "https://www.youtube.com/watch?v=Y8TwvdIPlxY",
+          "date": "2026-07-11",
+          "engagement": 10721,
+          "thumb": "https://i.ytimg.com/vi/Y8TwvdIPlxY/hqdefault.jpg"
+        },
+        {
+          "title": "脳トレに最適な推理算",
+          "url": "https://www.youtube.com/watch?v=DDrPc0uVGKs",
+          "date": "2026-07-11",
+          "engagement": 2685,
+          "thumb": "https://i.ytimg.com/vi/DDrPc0uVGKs/hqdefault.jpg"
+        },
+        {
+          "title": "頭が固いとひらめかない算数図形",
+          "url": "https://www.youtube.com/watch?v=qWrbdOcgoRA",
+          "date": "2026-07-10",
+          "engagement": 5575,
+          "thumb": "https://i.ytimg.com/vi/qWrbdOcgoRA/hqdefault.jpg"
+        },
+        {
+          "title": "ルート禁止の算数計算",
+          "url": "https://www.youtube.com/watch?v=Vru9VPNyAkU",
+          "date": "2026-07-10",
+          "engagement": 12901,
+          "thumb": "https://i.ytimg.com/vi/Vru9VPNyAkU/hqdefault.jpg"
+        },
+        {
+          "title": "柔軟な発想で解きたい正答率10％の問題",
+          "url": "https://www.youtube.com/watch?v=LeX1t7kTBdo",
+          "date": "2026-07-09",
+          "engagement": 3435,
+          "thumb": "https://i.ytimg.com/vi/LeX1t7kTBdo/hqdefault.jpg"
+        },
+        {
+          "title": "瞬時に誤答しやすい数の不思議",
+          "url": "https://www.youtube.com/watch?v=toK28KjTncc",
+          "date": "2026-07-09",
+          "engagement": 8378,
+          "thumb": "https://i.ytimg.com/vi/toK28KjTncc/hqdefault.jpg"
+        },
+        {
+          "title": "解けたら爽快、シンプル図形の長さ問題",
+          "url": "https://www.youtube.com/watch?v=6G89YpFmHJM",
+          "date": "2026-07-08",
+          "engagement": 5109,
+          "thumb": "https://i.ytimg.com/vi/6G89YpFmHJM/hqdefault.jpg"
+        },
+        {
+          "title": "少し高度な工夫が必要な素因数分解",
+          "url": "https://www.youtube.com/watch?v=ZxnMJx0sRfM",
+          "date": "2026-07-08",
+          "engagement": 13732,
+          "thumb": "https://i.ytimg.com/vi/ZxnMJx0sRfM/hqdefault.jpg"
+        },
+        {
+          "title": "気づければスカッとなれる算数角度",
+          "url": "https://www.youtube.com/watch?v=oj2psUlucPQ",
+          "date": "2026-07-07",
+          "engagement": 4429,
+          "thumb": "https://i.ytimg.com/vi/oj2psUlucPQ/hqdefault.jpg"
+        },
+        {
+          "title": "上手にさばきたい大小比較",
+          "url": "https://www.youtube.com/watch?v=9RGx54WbFFI",
+          "date": "2026-07-07",
+          "engagement": 6144,
+          "thumb": "https://i.ytimg.com/vi/9RGx54WbFFI/hqdefault.jpg"
+        },
+        {
+          "title": "少しの気づきがあれば一瞬で解ける角度問題",
+          "url": "https://www.youtube.com/watch?v=pSEqAWYe_kY",
+          "date": "2026-07-06",
+          "engagement": 4142,
+          "thumb": "https://i.ytimg.com/vi/pSEqAWYe_kY/hqdefault.jpg"
+        }
+      ]
+    }
+  ]
+}

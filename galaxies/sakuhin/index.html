@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>作品の星団 — Qurioverse</title>
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="30" fill="%23060409" stroke="%23f2ca6b" stroke-width="7"/></svg>'>
+<style>
+  :root{ --gold:#f2ca6b; --gold-dim:rgba(242,202,107,.55); --milk:#ece3d0; --muted:#9a8f76; --line:rgba(154,143,118,.28);
+    --space-0:#060409; --serif:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif;
+    --sans:-apple-system,"Hiragino Sans","Noto Sans JP",system-ui,sans-serif; }
+  *{box-sizing:border-box} html,body{height:100%;margin:0;overflow:hidden;background:var(--space-0);color:var(--milk);font-family:var(--sans)}
+  #scene{position:fixed;inset:0;z-index:0;touch-action:none}
+  /* HUD */
+  .hud{position:fixed;left:24px;top:20px;z-index:5;pointer-events:none;max-width:46vw}
+  .hud h1{font-family:var(--serif);font-size:22px;letter-spacing:.14em;margin:0;color:var(--milk);text-shadow:0 0 24px rgba(242,202,107,.2)}
+  .hud .sub{font-size:10.5px;letter-spacing:.28em;color:var(--muted);text-transform:uppercase;margin-top:5px}
+  .hud .stat{font-size:12px;color:var(--milk);opacity:.85;margin-top:12px;letter-spacing:.04em}
+  .hud .cap{font-size:11px;color:var(--muted);margin-top:4px}
+  .legend{margin-top:12px;font-size:11px;color:var(--muted);line-height:1.9}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+  /* 作品のホバー */
+  #tip{position:fixed;z-index:6;transform:translate(-50%,-50%);max-width:min(60vw,420px);text-align:center;pointer-events:none;opacity:0;transition:opacity .5s ease;
+    background:rgba(6,4,9,.62);padding:8px 16px;border-radius:12px;backdrop-filter:blur(3px)}
+  #tip.show{opacity:1}
+  #tip .q{margin:0;font-family:var(--serif);font-size:14.5px;line-height:1.7;letter-spacing:.06em;color:var(--gold);text-shadow:0 0 22px rgba(242,202,107,.5),0 2px 18px rgba(0,0,0,.85)}
+  #tip .k{display:block;margin-top:6px;font-size:9px;letter-spacing:.26em;color:var(--muted);text-transform:uppercase}
+  /* 星団名 */
+  .clabel{position:fixed;z-index:3;transform:translate(-50%,-50%);pointer-events:none;white-space:nowrap;
+    font-size:12px;letter-spacing:.22em;color:var(--muted);opacity:.78;text-shadow:0 2px 12px rgba(0,0,0,.8)}
+  .clabel b{display:block;font-family:var(--serif);font-size:14px;letter-spacing:.14em;color:var(--milk);opacity:.95;margin-bottom:2px}
+  .hint{position:fixed;right:18px;bottom:14px;z-index:5;font-size:10.5px;letter-spacing:.1em;color:var(--muted);opacity:.6;pointer-events:none}
+  /* 宇宙に戻る（既存ラッパーと同じ pill） */
+  .overlay{position:fixed;right:22px;top:18px;z-index:10;font-size:12.5px;letter-spacing:.14em}
+  .overlay a{color:var(--muted);background:rgba(6,4,9,.55);border:1px solid var(--line);border-radius:999px;
+    padding:7px 18px;backdrop-filter:blur(4px);text-decoration:none;transition:color .9s ease,border-color .9s ease}
+  .overlay a:hover,.overlay a:focus-visible{color:var(--gold);border-color:var(--gold-dim)}
+  #fallback{position:fixed;inset:0;display:none;align-items:center;justify-content:center;text-align:center;z-index:4;color:var(--muted);font-size:13px;letter-spacing:.06em;padding:24px}
+</style>
+</head>
+<body>
+<canvas id="scene" aria-hidden="true"></canvas>
+<header class="hud">
+  <h1>作品の星団</h1>
+  <div class="sub">Works · Instagram × YouTube</div>
+  <div class="stat" id="stat"></div>
+  <div class="cap">星=作品 二つの群れ=媒体（Instagram／YouTube） 輝度=反応 ホバーで作品・クリックで開く</div>
+  <div class="cap" id="src-note" style="opacity:.6"></div>
+  <div class="legend" id="legend"></div>
+</header>
+<div id="tip" role="note"><p class="q"></p><span class="k"></span></div>
+<div class="hint">ドラッグ=見渡す ／ 星にホバー=作品 ／ クリック=開く</div>
+<nav class="overlay" aria-label="航法"><a href="../../">↩ 宇宙に戻る — Universe</a></nav>
+<div id="fallback">作品の星団は準備中です。<br><a href="../../" style="color:var(--gold)">↩ 宇宙に戻る</a></div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const GOLD=0xf2ca6b, BG=0x060409;
+const hsh=(s)=>{let h=2166136261>>>0;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;};
+const mul=(a)=>()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
+
+const canvas=document.getElementById("scene");
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene(); scene.background=new THREE.Color(BG); scene.fog=new THREE.FogExp2(BG,0.0020);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,2000);
+
+function glowTex(rgb,mid=0.35){const c=document.createElement("canvas");c.width=c.height=128;const g=c.getContext("2d");
+  const gr=g.createRadialGradient(64,64,0,64,64,64);gr.addColorStop(0,`rgba(${rgb},1)`);gr.addColorStop(mid,`rgba(${rgb},0.3)`);gr.addColorStop(1,`rgba(${rgb},0)`);
+  g.fillStyle=gr;g.fillRect(0,0,128,128);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;}
+const DOT=glowTex("255,255,255",0.22), WARM=glowTex("242,202,107");
+function sprite(tex,color,scale,opacity){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,color,transparent:true,opacity,blending:THREE.AdditiveBlending,depthWrite:false}));s.scale.set(scale,scale,1);return s;}
+
+/* ---- 背景星野（他ページと同じ淡い遠景） ---- */
+(function(){const n=1200,pos=new Float32Array(n*3),rnd=mul(11);for(let i=0;i<n;i++){const th=rnd()*6.283,ph=Math.acos(2*rnd()-1),r=280+rnd()*520;
+  pos[i*3]=r*Math.sin(ph)*Math.cos(th);pos[i*3+1]=r*Math.cos(ph)*0.7;pos[i*3+2]=r*Math.sin(ph)*Math.sin(th);}
+  const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(g,new THREE.PointsMaterial({size:1.8,map:DOT,color:0x8a8168,transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false,fog:false})));})();
+
+const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));
+const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.60,0.6,0.3);composer.addPass(bloom);composer.addPass(new OutputPass());
+
+/* ---- カメラ: 制約付き orbit（両星団を見渡す） ---- */
+const camR=150,camBaseY=6;const YMAX=0.62,PMAX=0.36;let tYaw=0,tPitch=0,cYaw=0,cPitch=0;
+const clamp=(v,m)=>v<-m?-m:v>m?m:v;
+function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);composer.setSize(innerWidth,innerHeight);}
+resize();addEventListener("resize",resize);
+
+const PV=new THREE.Vector3();
+function place(el,world,dy){PV.copy(world);PV.y+=dy;PV.project(camera);const off=PV.z>1||Math.abs(PV.x)>1.3||Math.abs(PV.y)>1.3;
+  el.style.visibility=off?"hidden":"visible";el.style.left=((PV.x*0.5+0.5)*innerWidth)+"px";el.style.top=((-PV.y*0.5+0.5)*innerHeight)+"px";}
+
+const stars=[];        // {work, platform, name, metric, s, halo, base, tw, ph}
+const clabels=[];      // {el, c}
+let hoverStar=null;
+
+/* ---- 二重星団を組む（線なし＝星座と構造的に違う。重力で束ねた"群れ"） ---- */
+function build(data){
+  const clusters=data.clusters||[];
+  const CX=46;                                   // 星団の中心間の半分（隣り合う二群）
+  let total=0; const legendHtml=[];
+  clusters.forEach((cl,ci)=>{
+    const works=cl.works||[]; if(!works.length) return;
+    const cx=(clusters.length===1)?0:(ci===0?-CX:CX);
+    const center=new THREE.Vector3(cx,0,0);
+    const tex=glowTex(cl.hue||"236,227,208");
+    const color=new THREE.Color(`rgb(${cl.hue||"236,227,208"})`);
+    const maxEng=Math.max(1,...works.map(w=>w.engagement||0));
+    // 束縛のグロー（この群れが"ひとつ"であることを示す淡い星雲）＋ 密な核
+    const neb=sprite(tex,color,58,0.10); neb.position.copy(center); neb.renderOrder=0; scene.add(neb);
+    const core=sprite(WARM,new THREE.Color(GOLD),7,0.5); core.position.copy(center); core.renderOrder=1; scene.add(core);
+    works.forEach((w,i)=>{
+      const rnd=mul(hsh(cl.platform+":"+i+":"+(w.title||"")));
+      // 3D ガウス風散布（中心ほど密・線は引かない）
+      const th=rnd()*6.283, phi=Math.acos(2*rnd()-1), r=24*(0.16+0.84*Math.sqrt(rnd()));
+      const off=new THREE.Vector3(r*Math.sin(phi)*Math.cos(th), r*Math.sin(phi)*Math.sin(th)*0.82, r*Math.cos(phi)*0.7);
+      const p=center.clone().add(off);
+      const b=Math.log1p(w.engagement||0)/Math.log1p(maxEng);   // 反応→輝度（クラスタ内で正規化＝尺度差を吸収）
+      const sz=3.2+b*6, op=0.5+b*0.42;
+      const s=sprite(tex,color,sz,op); s.position.copy(p); s.renderOrder=2; scene.add(s);
+      const halo=sprite(tex,color,sz*2.0,0.07+b*0.08); halo.position.copy(p); halo.renderOrder=1; scene.add(halo);
+      stars.push({work:w,platform:cl.name,metric:cl.metric,s,halo,base:{sz,op},tw:0.5+rnd()*1.6,ph:rnd()*6.283});
+      total++;
+    });
+    // 星団名ラベル
+    const el=document.createElement("div"); el.className="clabel";
+    el.innerHTML=`<b>${cl.name}</b>${(cl.handle?("@"+cl.handle):"")} · ${works.length}`;
+    document.body.appendChild(el); clabels.push({el,c:center.clone()});
+    legendHtml.push(`<span><i style="background:rgb(${cl.hue})"></i>${cl.name} ${works.length}</span>`);
+  });
+  document.getElementById("stat").textContent=`${total} 作品 ／ ${clusters.length} の星団`;
+  document.getElementById("legend").innerHTML=legendHtml.join(" 　");
+  const srcEl=document.getElementById("src-note");
+  if(srcEl) srcEl.textContent="データ: "+clusters.map(c=>`${c.name}=${c.source==="youtube-rss"?"公式RSS":"手動"}`).join(" ／ ");
+  if(!total){ document.getElementById("fallback").style.display="flex"; }
+}
+
+/* ---- ホバー＋クリックで開く ---- */
+const ndc=new THREE.Vector2(-2,-2),ray=new THREE.Raycaster();ray.params.Sprite={threshold:0};
+const tip=document.getElementById("tip"),tipQ=tip.querySelector(".q"),tipK=tip.querySelector(".k");
+let dragging=false,moved=false,lx=0,ly=0,dx0=0,dy0=0;
+addEventListener("pointerdown",e=>{dragging=true;moved=false;lx=dx0=e.clientX;ly=dy0=e.clientY;});
+addEventListener("pointerup",()=>{ dragging=false;
+  if(!moved&&hoverStar&&hoverStar.work.url) window.open(hoverStar.work.url,"_blank","noopener"); });
+addEventListener("pointermove",e=>{ndc.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight*2-1));
+  if(dragging&&!REDUCED){const dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;
+    if(Math.abs(e.clientX-dx0)+Math.abs(e.clientY-dy0)>6)moved=true;
+    if(moved){tYaw=clamp(tYaw-dx*0.002,YMAX);tPitch=clamp(tPitch+dy*0.002,PMAX);}}});
+function metricLabel(m){return m==="views"?"▶":(m==="likes"?"♡":"·");}
+function pick(){ray.setFromCamera(ndc,camera);const objs=stars.map(s=>s.s);const hit=ray.intersectObjects(objs,false);
+  const found=hit.length?stars.find(s=>s.s===hit[0].object):null;
+  if(found!==hoverStar){hoverStar=found;canvas.style.cursor=found?"pointer":"default";
+    if(found){tipQ.textContent=found.work.title||"（無題）";
+      tipK.textContent=found.platform+" · "+metricLabel(found.metric)+(found.work.engagement??"")+" · クリックで開く";
+      tip.classList.add("show");}
+    else tip.classList.remove("show");}}
+
+/* ---- ループ ---- */
+const clock=new THREE.Clock();
+function frame(){const t=clock.getElapsedTime();
+  cYaw+=(tYaw-cYaw)*0.045;cPitch+=(tPitch-cPitch)*0.045;
+  const yaw=cYaw+Math.sin(t*0.05)*0.02,pitch=cPitch+Math.sin(t*0.037)*0.012,cp=Math.cos(pitch);
+  camera.position.set(camR*Math.sin(yaw)*cp,camBaseY+camR*Math.sin(pitch),camR*Math.cos(yaw)*cp);camera.lookAt(0,0,0);
+  stars.forEach(st=>{const tw=0.82+0.18*Math.sin(t*st.tw+st.ph);const hot=hoverStar===st?1.55:1;
+    st.s.material.opacity=st.base.op*tw*(hot>1?1.18:1);st.s.scale.setScalar(st.base.sz*hot);});
+  pick();composer.render();
+  clabels.forEach(l=>place(l.el,l.c,20));
+  if(hoverStar){const p=hoverStar.s.position;PV.copy(p);PV.y+=5;PV.project(camera);
+    tip.style.left=((PV.x*0.5+0.5)*innerWidth)+"px";tip.style.top=((-PV.y*0.5+0.5)*innerHeight)+"px";}
+  if(!REDUCED)requestAnimationFrame(frame);}
+
+/* ---- データ読込（fail-open） ---- */
+fetch("works.json").then(r=>{if(!r.ok)throw new Error("works.json "+r.status);return r.json();})
+  .then(data=>{ build(data); frame(); if(REDUCED){composer.render();clabels.forEach(l=>place(l.el,l.c,20));} })
+  .catch(err=>{ console.error("[sakuhin]",err); document.getElementById("fallback").style.display="flex"; });
+</script>
+</body>
+</html>
