@@ -68,7 +68,7 @@
   }
   #l-kenkyu { left: 72%; top: 40%; }
   #l-kotoba { left: 20%; top: 46%; }
-  #l-koe    { left: 68%; top: 76%; opacity: 0.75; }
+  #l-koe    { left: 68%; top: 76%; }
 
   .speck-label {
     position: fixed; z-index: 3; transform: translate(-50%, -50%); pointer-events: none;
@@ -173,7 +173,7 @@
 </a>
 <a class="glabel" id="l-koe" href="galaxies/koe/">
   <span class="g-name">声の銀河</span>
-  <span class="g-sub">Voice · 観測準備中</span>
+  <span class="g-sub">Voice · 未知の理への道のり</span>
 </a>
 <div class="speck-label" id="l-apps">作品の星団 · 準備中</div>
 <div class="speck-label" id="l-hand">手の星雲 · 準備中</div>
@@ -354,7 +354,7 @@ function makeGalaxy({ seed, arms, radius, dim = 1, tiltX, tiltZ }) {
 const GX = [
   { key: "kenkyu", label: "l-kenkyu", href: "galaxies/kenkyu/", g: makeGalaxy({ seed: 901, arms: 9, radius: 30, tiltX: -0.86, tiltZ: 0.42 }) },
   { key: "kotoba", label: "l-kotoba", href: "galaxies/kotoba/", g: makeGalaxy({ seed: 702, arms: 7, radius: 23, tiltX: -1.0, tiltZ: -0.34 }) },
-  { key: "koe", label: "l-koe", href: "galaxies/koe/", g: makeGalaxy({ seed: 503, arms: 5, radius: 17, dim: 0.4, tiltX: -0.72, tiltZ: 0.2 }) },
+  { key: "koe", label: "l-koe", href: "galaxies/koe/", g: makeGalaxy({ seed: 503, arms: 9, radius: 20, tiltX: -0.72, tiltZ: 0.2 }) },
 ];
 GX.forEach((x) => scene.add(x.g.group));
 

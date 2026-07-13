@@ -6,20 +6,26 @@
 <title>声の銀河 — Qurioverse</title>
 <link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="30" fill="%23060409" stroke="%23f2ca6b" stroke-width="7"/></svg>'>
 <link rel="stylesheet" href="../../assets/tokens.css">
+<style>
+  html, body { height: 100%; overflow: hidden; }
+  iframe { position: fixed; inset: 0; width: 100%; height: 100%; border: 0; background: var(--space-0); }
+  .overlay {
+    position: fixed; right: 22px; top: 18px; z-index: 10;
+    font-size: 12.5px; letter-spacing: 0.14em;
+    animation: page-in var(--fade) ease both;
+  }
+  .overlay a {
+    color: var(--muted); background: rgba(6, 4, 9, 0.55);
+    border: 1px solid var(--line); border-radius: 999px;
+    padding: 7px 18px; backdrop-filter: blur(4px);
+  }
+  .overlay a:hover, .overlay a:focus-visible { color: var(--gold); border-color: var(--gold-dim); }
+</style>
 </head>
 <body>
-<main class="page" style="text-align:center;">
-  <a class="back" href="../../">↩ 宇宙に戻る — Universe</a>
-  <h1>声の銀河</h1>
-  <span class="en">Voice Galaxy</span>
-  <p style="margin-top:64px;">この銀河は、まだ望遠鏡の焦点を合わせているところ。</p>
-  <p class="dim">話した声が星になる銀河です。観測の準備が整いしだい、ここに現れます。</p>
-  <nav class="navline" style="justify-content:center;" aria-label="航法">
-    <a href="../../">宇宙 — Universe</a>
-    <a href="../../about/">観測者について — About</a>
-    <a href="../../contact/">交信 — Contact</a>
-  </nav>
-</main>
-<script src="../../assets/starfield.js"></script>
+<iframe src="voice-galaxy.html" title="声の銀河 — 未知の理への道のり"></iframe>
+<nav class="overlay" aria-label="航法">
+  <a href="../../">↩ 宇宙に戻る — Universe</a>
+</nav>
 </body>
 </html>
