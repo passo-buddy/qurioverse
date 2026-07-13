@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>発見の星座 — Discovery Constellation</title>
+<link rel="icon" href='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="50" cy="50" r="30" fill="%23060409" stroke="%23f2ca6b" stroke-width="7"/></svg>'>
+<style>
+  :root{ --gold:#f2ca6b; --milk:#ece3d0; --cyan:#9fe8dc; --muted:#9a8f76; --line:rgba(154,143,118,.28);
+    --serif:"Hiragino Mincho ProN","Yu Mincho","Noto Serif JP",serif; --sans:-apple-system,"Hiragino Sans","Noto Sans JP",system-ui,sans-serif; }
+  *{box-sizing:border-box} html,body{height:100%;margin:0;overflow:hidden;background:#060409;color:var(--milk);font-family:var(--sans)}
+  #scene{position:fixed;inset:0;z-index:0;touch-action:none}
+  /* HUD */
+  .hud{position:fixed;left:24px;top:20px;z-index:5;pointer-events:none;max-width:46vw}
+  .hud h1{font-family:var(--serif);font-size:22px;letter-spacing:.14em;margin:0;color:var(--milk);text-shadow:0 0 24px rgba(242,202,107,.2)}
+  .hud .sub{font-size:10.5px;letter-spacing:.28em;color:var(--muted);text-transform:uppercase;margin-top:5px}
+  .hud .stat{font-size:12px;color:var(--milk);opacity:.85;margin-top:12px;letter-spacing:.04em}
+  .hud .cap{font-size:11px;color:var(--muted);margin-top:4px}
+  .legend{margin-top:12px;font-size:11px;color:var(--muted);line-height:1.9}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+  /* 星のホバー本文 */
+  #tip{position:fixed;z-index:6;transform:translate(-50%,-50%);max-width:min(60vw,420px);text-align:center;pointer-events:none;opacity:0;transition:opacity .5s ease}
+  #tip.show{opacity:1}
+  #tip .q{margin:0;font-family:var(--serif);font-size:14.5px;line-height:1.7;letter-spacing:.06em;color:var(--gold);text-shadow:0 0 22px rgba(242,202,107,.5),0 2px 18px rgba(0,0,0,.85)}
+  #tip .k{display:block;margin-top:6px;font-size:9px;letter-spacing:.26em;color:var(--muted);text-transform:uppercase}
+  /* 星座名 */
+  .clabel{position:fixed;z-index:3;transform:translate(-50%,-50%);pointer-events:none;white-space:nowrap;
+    font-size:11px;letter-spacing:.2em;color:var(--muted);opacity:.7;text-shadow:0 2px 12px rgba(0,0,0,.8)}
+  .hint{position:fixed;right:18px;bottom:14px;z-index:5;font-size:10.5px;letter-spacing:.1em;color:var(--muted);opacity:.6;pointer-events:none}
+</style>
+</head>
+<body>
+<canvas id="scene" aria-hidden="true"></canvas>
+<header class="hud">
+  <h1>発見の星座</h1>
+  <div class="sub">Discovery Constellation · 思考の配線</div>
+  <div class="stat" id="stat"></div>
+  <div class="cap">線=関係（配線） 星=発見/問い/洞察/実 輝度=被参照 金の橋=別領域の類似</div>
+  <div class="legend" id="legend"></div>
+</header>
+<div id="tip" role="note"><p class="q"></p><span class="k"></span></div>
+<div class="hint">ドラッグ=見渡す ／ 星にホバー=本文＋配線が光る</div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.161.0/examples/jsm/"}}
+</script>
+<script type="module">
+import * as THREE from "three";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
+
+const GRAPH = /*__GRAPH__*/null;
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const GOLD=0xf2ca6b, MILK=0xece3d0, CYAN=0x9fe8dc, VIOLET=0xb59be0, BG=0x060409;
+const hsh=(s)=>{let h=2166136261>>>0;for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619);}return h>>>0;};
+const mul=(a)=>()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};
+
+const canvas=document.getElementById("scene");
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+const scene=new THREE.Scene(); scene.background=new THREE.Color(BG); scene.fog=new THREE.FogExp2(BG,0.0022);
+const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,0.1,2000);
+
+function glowTex(rgb,mid=0.35){const c=document.createElement("canvas");c.width=c.height=128;const g=c.getContext("2d");
+  const gr=g.createRadialGradient(64,64,0,64,64,64);gr.addColorStop(0,`rgba(${rgb},1)`);gr.addColorStop(mid,`rgba(${rgb},0.3)`);gr.addColorStop(1,`rgba(${rgb},0)`);
+  g.fillStyle=gr;g.fillRect(0,0,128,128);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;return t;}
+const TEX={dot:glowTex("255,255,255",0.22),warm:glowTex("242,202,107"),milk:glowTex("236,227,208"),cyan:glowTex("159,232,220"),violet:glowTex("181,155,224")};
+function sprite(tex,color,scale,opacity){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:tex,color,transparent:true,opacity,blending:THREE.AdditiveBlending,depthWrite:false}));s.scale.set(scale,scale,1);return s;}
+
+/* ---- 背景星野 ---- */
+(function(){const n=1400,pos=new Float32Array(n*3),rnd=mul(7);for(let i=0;i<n;i++){const th=rnd()*6.283,ph=Math.acos(2*rnd()-1),r=260+rnd()*520;
+  pos[i*3]=r*Math.sin(ph)*Math.cos(th);pos[i*3+1]=r*Math.cos(ph)*0.7;pos[i*3+2]=r*Math.sin(ph)*Math.sin(th);}
+  const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(g,new THREE.PointsMaterial({size:1.8,map:TEX.dot,color:0x8a8168,transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false,fog:false})));})();
+
+/* ---- レイアウト: テーマ星座を環状に配置・各ノードは局所散布（決定論） ---- */
+const nodes=GRAPH.nodes, edges=GRAPH.edges;
+const byId={}; nodes.forEach(n=>byId[n.id]=n);
+const themes=[...new Set(nodes.map(n=>n.bucket||"その他"))];
+const themeAng={}; themes.forEach((t,i)=>themeAng[t]=i/themes.length*Math.PI*2);
+const RT=62; // テーマ環の半径
+const themeCenter={}; themes.forEach(t=>{const a=themeAng[t];themeCenter[t]=new THREE.Vector3(Math.cos(a)*RT,Math.sin(a)*RT*0.62,Math.sin(a*1.7)*10);});
+const pos={}; const groupByTheme={};
+nodes.forEach(n=>{(groupByTheme[n.bucket]=groupByTheme[n.bucket]||[]).push(n);});
+themes.forEach(t=>{const arr=groupByTheme[t];const c=themeCenter[t];const rnd=mul(hsh("th:"+t));
+  const spread=10+Math.sqrt(arr.length)*7;
+  arr.sort((a,b)=>(a.date||"").localeCompare(b.date||""));
+  arr.forEach((n,i)=>{const a=rnd()*6.283, r=spread*(0.25+0.75*Math.sqrt((i+0.5)/arr.length));
+    pos[n.id]=new THREE.Vector3(c.x+Math.cos(a)*r+(rnd()-0.5)*4, c.y+Math.sin(a)*r*0.8+(rnd()-0.5)*4, c.z+(rnd()-0.5)*12);});});
+
+/* ---- エッジ（配線が主役） ---- */
+const AUTH={spawned:0xf2ca6b,extends:0xece3d0,supports:0x9fe8dc,answers:0xcfe8a0,contradicts:0xe08a7a};
+function lineSeg(list,color,opacity,width){const p=[];list.forEach(([a,b])=>{const pa=pos[a],pb=pos[b];if(pa&&pb){p.push(pa.x,pa.y,pa.z,pb.x,pb.y,pb.z);}});
+  const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.BufferAttribute(new Float32Array(p),3));
+  return new THREE.LineSegments(g,new THREE.LineBasicMaterial({color,transparent:true,opacity,blending:THREE.AdditiveBlending,depthWrite:false}));}
+// link（派生）= 淡い結合組織 / authored（配線）= 明るい / analogous = 金の橋（弧）
+const linkEdges=edges.filter(e=>e.type==="link");
+const authEdges=edges.filter(e=>e.type in AUTH);
+const anaEdges=edges.filter(e=>e.type==="analogous");
+scene.add(lineSeg(linkEdges.map(e=>[e.from,e.to]),0x3a5a6a,0.05));
+Object.keys(AUTH).forEach(tp=>scene.add(lineSeg(authEdges.filter(e=>e.type===tp).map(e=>[e.from,e.to]),AUTH[tp],0.5)));
+// analogous = 上に弧を描く金の橋
+const anaGroup=new THREE.Group();
+anaEdges.forEach(e=>{const pa=pos[e.from],pb=pos[e.to];if(!pa||!pb)return;const mid=pa.clone().add(pb).multiplyScalar(0.5);mid.z+=18+pa.distanceTo(pb)*0.12;
+  const curve=new THREE.QuadraticBezierCurve3(pa,mid,pb);const g=new THREE.BufferGeometry().setFromPoints(curve.getPoints(24));
+  anaGroup.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:GOLD,transparent:true,opacity:0.32,blending:THREE.AdditiveBlending,depthWrite:false})));});
+scene.add(anaGroup);
+
+/* ---- 星（種別グリフ・被参照で輝度/大きさ） ---- */
+const TYPE={discovery:{tex:TEX.warm,color:0xffe6b0,label:"発見"},question:{tex:TEX.cyan,color:0xbfeee6,label:"問い"},
+  insight:{tex:TEX.violet,color:0xd9c4ff,label:"洞察"},note:{tex:TEX.milk,color:MILK,label:"実"}};
+const stars=[]; const maxIndeg=Math.max(1,...nodes.map(n=>n.indeg||0));
+nodes.forEach(n=>{const ty=TYPE[n.type]||TYPE.note;const p=pos[n.id];if(!p)return;
+  const b=(n.indeg||0)/maxIndeg;const sz=3.6+b*5;
+  const s=sprite(ty.tex,ty.color,sz,0.55+b*0.38);s.position.copy(p);s.renderOrder=2;scene.add(s);
+  // 種別の暈（問い=まだ結ばれきらない点の気配）
+  const halo=sprite(ty.tex,ty.color,sz*2.0,0.08+b*0.10);halo.position.copy(p);scene.add(halo);
+  stars.push({n,s,halo,p,baseSz:sz,baseOp:0.55+b*0.4,tw:0.5+mul(hsh(n.id))()*1.6,ph:hsh(n.id)%628/100});});
+
+/* ---- 隣接（ホバーで配線を辿る） ---- */
+const adj={}; nodes.forEach(n=>adj[n.id]=[]);
+edges.forEach(e=>{if(pos[e.from]&&pos[e.to]){adj[e.from].push(e.to);adj[e.to].push(e.from);}});
+
+/* ---- Bloom ---- */
+const composer=new EffectComposer(renderer);composer.addPass(new RenderPass(scene,camera));
+const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.56,0.62,0.32);composer.addPass(bloom);composer.addPass(new OutputPass());
+
+/* ---- カメラ: 制約付き orbit（発見も見渡す） ---- */
+let camR=150,camBaseY=4;const YMAX=0.7,PMAX=0.4;let tYaw=0,tPitch=0,cYaw=0,cPitch=0;
+const clamp=(v,m)=>v<-m?-m:v>m?m:v;
+function resize(){camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);composer.setSize(innerWidth,innerHeight);}
+resize();addEventListener("resize",resize);
+
+/* ---- テーマ星座名ラベル ---- */
+const labels=themes.map(t=>{const el=document.createElement("div");el.className="clabel";el.textContent=t;document.body.appendChild(el);return{el,c:themeCenter[t]};});
+const PV=new THREE.Vector3();
+function place(el,world,dy){PV.copy(world);PV.y+=dy;PV.project(camera);const off=PV.z>1||Math.abs(PV.x)>1.3||Math.abs(PV.y)>1.3;
+  el.style.visibility=off?"hidden":"visible";el.style.left=((PV.x*0.5+0.5)*innerWidth)+"px";el.style.top=((-PV.y*0.5+0.5)*innerHeight)+"px";}
+
+/* ---- ホバー ---- */
+const ndc=new THREE.Vector2(-2,-2),ray=new THREE.Raycaster();ray.params.Sprite={threshold:0};let hoverNode=null;
+const tip=document.getElementById("tip"),tipQ=tip.querySelector(".q"),tipK=tip.querySelector(".k");
+let dragging=false,moved=false,lx=0,ly=0,dx0=0,dy0=0;
+addEventListener("pointerdown",e=>{dragging=true;moved=false;lx=dx0=e.clientX;ly=dy0=e.clientY;});
+addEventListener("pointerup",()=>{dragging=false;});
+addEventListener("pointermove",e=>{ndc.set(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight*2-1));
+  if(dragging&&!REDUCED){const dx=e.clientX-lx,dy=e.clientY-ly;lx=e.clientX;ly=e.clientY;
+    if(Math.abs(e.clientX-dx0)+Math.abs(e.clientY-dy0)>6)moved=true;
+    if(moved){tYaw=clamp(tYaw-dx*0.002,YMAX);tPitch=clamp(tPitch+dy*0.002,PMAX);}}});
+const spriteObjs=stars.map(s=>s.s);
+function pick(){ray.setFromCamera(ndc,camera);const hit=ray.intersectObjects(spriteObjs,false);
+  const found=hit.length?stars.find(s=>s.s===hit[0].object):null;const fn=found?found.n:null;
+  if(fn!==hoverNode){hoverNode=fn;canvas.style.cursor=fn?"help":"default";
+    if(fn){tipQ.textContent=fn.summary;tipK.textContent=(TYPE[fn.type]||TYPE.note).label+" · "+(fn.bucket||"");tip.classList.add("show");firePulses(fn.id);}
+    else tip.classList.remove("show");}}
+
+/* ---- 光のパルス（配線を伝う） ---- */
+const pulses=[];const pulsePool=[];
+function getPulse(){let p=pulsePool.pop();if(!p){p=sprite(TEX.warm,0xffe6b0,3.4,0);p.renderOrder=3;scene.add(p);}return p;}
+function firePulses(id){if(REDUCED)return;adj[id].forEach(to=>{const a=pos[id],b=pos[to];if(!a||!b)return;const s=getPulse();
+  pulses.push({s,a,b,t:0,sp:0.5+Math.random()*0});});}
+function updatePulses(dt){for(let i=pulses.length-1;i>=0;i--){const p=pulses[i];p.t+=dt*0.9;
+  if(p.t>=1){p.s.material.opacity=0;pulsePool.push(p.s);pulses.splice(i,1);continue;}
+  p.s.position.copy(p.a).lerp(p.b,p.t);p.s.material.opacity=Math.sin(p.t*Math.PI)*0.9;}}
+
+document.getElementById("stat").textContent=`${nodes.length} 星 ／ ${authEdges.length} の配線 ／ 金の橋 ${anaEdges.length} ／ 星座 ${themes.length}`;
+document.getElementById("legend").innerHTML=Object.values(TYPE).map((t,i)=>{
+  const cols=["#ffe6b0","#bfeee6","#d9c4ff","#ece3d0"];return `<span><i style="background:${cols[i]}"></i>${t.label}</span>`;}).join(" 　");
+
+/* ---- ループ ---- */
+const clock=new THREE.Clock();let last=0;
+function frame(){const t=clock.getElapsedTime();const dt=Math.min(0.05,t-last);last=t;
+  cYaw+=(tYaw-cYaw)*0.045;cPitch+=(tPitch-cPitch)*0.045;
+  const yaw=cYaw+Math.sin(t*0.05)*0.02,pitch=cPitch+Math.sin(t*0.037)*0.012,cp=Math.cos(pitch);
+  camera.position.set(camR*Math.sin(yaw)*cp,camBaseY+camR*Math.sin(pitch),camR*Math.cos(yaw)*cp);camera.lookAt(0,0,0);
+  // 星の瞬き＋ホバー強調
+  stars.forEach(st=>{const tw=0.82+0.18*Math.sin(t*st.tw+st.ph);const hot=hoverNode===st.n.id?1.6:(hoverNode&&adj[hoverNode].includes(st.n.id)?1.3:1);
+    st.s.material.opacity=st.baseOp*tw*(hot>1?1.15:1);st.s.scale.setScalar(st.baseSz*hot);});
+  updatePulses(dt);
+  pick();composer.render();
+  labels.forEach(l=>place(l.el,l.c,10));
+  if(hoverNode){const p=pos[hoverNode];PV.copy(p);PV.y+=6;PV.project(camera);tip.style.left=((PV.x*0.5+0.5)*innerWidth)+"px";tip.style.top=((-PV.y*0.5+0.5)*innerHeight)+"px";}
+  if(!REDUCED)requestAnimationFrame(frame);}
+frame();
+if(REDUCED){composer.render();labels.forEach(l=>place(l.el,l.c,10));}
+</script>
+</body>
+</html>
