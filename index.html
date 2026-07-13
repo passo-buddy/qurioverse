@@ -72,6 +72,8 @@
   #l-hakken { left: 40%; top: 30%; }
   /* 新しく生まれた星: 該当銀河ラベルに金の marker（数字なし=気配を保つが perceptible） */
   .glabel.born .g-name::after { content: " · 新星"; color: var(--gold); font-size: 0.7em; letter-spacing: 0.1em; opacity: 0.92; }
+  /* 裏面あり（表裏フリップ＝署名的操作）: 思想の面を持つ銀河に淡い金グリフ。born が ::after を占有済ゆえ ::before。back-readiness で点灯（漸進） */
+  .glabel.hasflip .g-name::before { content: "❋ "; color: var(--gold-dim); font-size: 0.72em; opacity: 0.8; }
 
   .speck-label {
     position: fixed; z-index: 3; transform: translate(-50%, -50%); pointer-events: none;
@@ -174,7 +176,7 @@
   <span class="g-name">ことばの銀河</span>
   <span class="g-sub">Note · 書いたものの渦</span>
 </a>
-<a class="glabel" id="l-koe" href="galaxies/koe/">
+<a class="glabel hasflip" id="l-koe" href="galaxies/koe/">
   <span class="g-name">声の銀河</span>
   <span class="g-sub">Voice · 未知の理への道のり</span>
 </a>
