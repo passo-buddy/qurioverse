@@ -44,7 +44,7 @@
   <h1>発見の星座</h1>
   <div class="sub">Discovery Constellation · 思考の配線</div>
   <div class="stat" id="stat"></div>
-  <div class="cap">線=関係（配線） 星=発見/問い/洞察/実 輝度=被参照 金の橋=別領域の類似</div>
+  <div class="cap">線=関係（配線） 星=発見/問い/洞察/記録 輝度=被参照 金の橋=別領域の類似</div>
   <div class="legend" id="legend"></div>
 </header>
 <div id="tip" role="note"><p class="q"></p><span class="k"></span></div>
@@ -143,7 +143,7 @@ let ph=PEND, playing=false, setPlayBtn=()=>{};
 
 /* ---- 星（種別グリフ・被参照で輝度/大きさ） ---- */
 const TYPE={discovery:{tex:TEX.warm,color:0xffe6b0,label:"発見"},question:{tex:TEX.cyan,color:0xbfeee6,label:"問い"},
-  insight:{tex:TEX.violet,color:0xd9c4ff,label:"洞察"},note:{tex:TEX.milk,color:MILK,label:"実"}};
+  insight:{tex:TEX.violet,color:0xd9c4ff,label:"洞察"},note:{tex:TEX.milk,color:MILK,label:"記録"}};
 const stars=[]; const maxIndeg=Math.max(1,...nodes.map(n=>n.indeg||0));
 nodes.forEach(n=>{const ty=TYPE[n.type]||TYPE.note;const p=pos[n.id];if(!p)return;
   const b=(n.indeg||0)/maxIndeg;const sz=3.6+b*5;
