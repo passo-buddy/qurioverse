@@ -124,7 +124,7 @@ G.axes.forEach((ax,i)=>{
   const eg=new THREE.BufferGeometry().setFromPoints(ep);
   mandala.add(new THREE.Line(eg,new THREE.LineBasicMaterial({color:col,transparent:true,opacity:.35})));
   // 軸ラベル（billboard）
-  mandala.add(labelSprite((ax.motif?ax.motif+" ":"")+ax.title, ax.color, W(a,R_OUT+22,10), 1));
+  mandala.add(labelSprite(ax.title, ax.color, W(a,R_OUT+22,10), 1)); // motif(絵文字)は不使用＝明朝テキストのみ
 });
 
 // 中心の核
@@ -138,7 +138,10 @@ G.axes.forEach((ax,i)=>{
 
 function labelSprite(txt, color, posV, scale, big){
   const c=document.createElement("canvas");c.width=1024;c.height=256;const x=c.getContext("2d");
-  x.font=(big?"700 ":"600 ")+(big?92:60)+"px 'Hiragino Mincho ProN','Yu Mincho',serif";
+  const fam="'Hiragino Mincho ProN','Yu Mincho',serif";let fs=(big?92:60);
+  x.font=(big?"700 ":"600 ")+fs+"px "+fam;
+  const maxw=1024-80; // canvas 幅に収める（長い中央タイトルの左右見切れ防止＝フォント自動縮小）
+  while(x.measureText(txt).width>maxw && fs>22){fs-=4;x.font=(big?"700 ":"600 ")+fs+"px "+fam;}
   x.fillStyle=color;x.textAlign="center";x.textBaseline="middle";x.shadowColor="rgba(0,0,0,.95)";x.shadowBlur=18;
   x.fillText(txt,512,128);const t=new THREE.CanvasTexture(c);
   const s=new THREE.Sprite(new THREE.SpriteMaterial({map:t,transparent:true,depthTest:false,depthWrite:false}));
@@ -166,11 +169,11 @@ G.eps.forEach(e=>{
 // 凡例
 const leg=document.getElementById("legend"),panel=document.getElementById("panel");
 G.axes.forEach((a,i)=>{const d=document.createElement("div");d.className="li";
-  d.innerHTML=`<span class="sw" style="background:${a.color};color:${a.color}"></span><span>${a.motif} ${esc(a.title)} <span style="color:#6f6754">${a.count}</span></span>`;
+  d.innerHTML=`<span class="sw" style="background:${a.color};color:${a.color}"></span><span>${esc(a.title)} <span style="color:#6f6754">${a.count}</span></span>`;
   d.addEventListener("mouseenter",()=>focusAxis(i));d.addEventListener("mouseleave",clearAxis);leg.appendChild(d);});
 function focusAxis(i){petalMeshes.forEach(m=>m.material.opacity=(m.userData.axis===i)?0.32:0.04);
   for(let k=0;k<N;k++)epByAxis[k].forEach(g=>g.children[0].material.opacity=(k===i)?.95:.12);
-  const a=G.axes[i];panel.innerHTML=`<div class="pt" style="color:${a.color}">${a.motif} ${esc(a.title)}</div><div class="pe">${esc(a.essence)}</div>`;panel.style.opacity=1;}
+  const a=G.axes[i];panel.innerHTML=`<div class="pt" style="color:${a.color}">${esc(a.title)}</div><div class="pe">${esc(a.essence)}</div>`;panel.style.opacity=1;}
 function clearAxis(){petalMeshes.forEach(m=>m.material.opacity=m.userData.base);
   for(let k=0;k<N;k++)epByAxis[k].forEach(g=>g.children[0].material.opacity=.75);panel.style.opacity=0;}
 
@@ -183,7 +186,7 @@ addEventListener("pointermove",ev=>{mouse.x=(ev.clientX/innerWidth)*2-1;mouse.y=
   if(h.length){const e=h[0].object.userData.ep;hoverEp=e;document.body.style.cursor="pointer";
     const ppl=e.people&&e.people.length?`<div class="tg">🎙 ${esc(e.people.join("・"))}</div>`:"";
     const tg=e.themes&&e.themes.length?`<div class="tg">${e.themes.map(t=>"#"+esc(t)).join("  ")}</div>`:"";
-    tip.innerHTML=`<div class="tm">${G.axes[e.axis].motif} ${esc(G.axes[e.axis].title)} · ${e.date} · ${esc(e.durstr)}</div>`+
+    tip.innerHTML=`<div class="tm">${esc(G.axes[e.axis].title)} · ${e.date} · ${esc(e.durstr)}</div>`+
       `<div class="tt">${esc(e.title)}</div>`+ppl+tg+`<div class="to">クリックで配信を開く ↗</div>`;
     tip.style.opacity=1;tip.style.left=Math.min(ev.clientX+15,innerWidth-330)+"px";tip.style.top=Math.min(ev.clientY+13,innerHeight-150)+"px";
   }else{hoverEp=null;document.body.style.cursor="default";tip.style.opacity=0;
