@@ -92,21 +92,24 @@ themes.forEach(t=>{const arr=groupByTheme[t];const c=themeCenter[t];const rnd=mu
 
 /* ---- エッジ（配線が主役） ---- */
 const AUTH={spawned:0xf2ca6b,extends:0xece3d0,supports:0x9fe8dc,answers:0xcfe8a0,contradicts:0xe08a7a};
-function lineSeg(list,color,opacity,width){const p=[];list.forEach(([a,b])=>{const pa=pos[a],pb=pos[b];if(pa&&pb){p.push(pa.x,pa.y,pa.z,pb.x,pb.y,pb.z);}});
-  const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.BufferAttribute(new Float32Array(p),3));
-  return new THREE.LineSegments(g,new THREE.LineBasicMaterial({color,transparent:true,opacity,blending:THREE.AdditiveBlending,depthWrite:false}));}
-// link（派生）= 淡い結合組織 / authored（配線）= 明るい / analogous = 金の橋（弧）
 const linkEdges=edges.filter(e=>e.type==="link");
 const authEdges=edges.filter(e=>e.type in AUTH);
 const anaEdges=edges.filter(e=>e.type==="analogous");
-scene.add(lineSeg(linkEdges.map(e=>[e.from,e.to]),0x3a5a6a,0.05));
-Object.keys(AUTH).forEach(tp=>scene.add(lineSeg(authEdges.filter(e=>e.type===tp).map(e=>[e.from,e.to]),AUTH[tp],0.5)));
-// analogous = 上に弧を描く金の橋
-const anaGroup=new THREE.Group();
-anaEdges.forEach(e=>{const pa=pos[e.from],pb=pos[e.to];if(!pa||!pb)return;const mid=pa.clone().add(pb).multiplyScalar(0.5);mid.z+=18+pa.distanceTo(pb)*0.12;
-  const curve=new THREE.QuadraticBezierCurve3(pa,mid,pb);const g=new THREE.BufferGeometry().setFromPoints(curve.getPoints(24));
-  anaGroup.add(new THREE.Line(g,new THREE.LineBasicMaterial({color:GOLD,transparent:true,opacity:0.32,blending:THREE.AdditiveBlending,depthWrite:false})));});
-scene.add(anaGroup);
+// link（派生）= 淡い結合組織（静的・一括）
+{const p=[];linkEdges.forEach(e=>{const a=pos[e.from],b=pos[e.to];if(a&&b)p.push(a.x,a.y,a.z,b.x,b.y,b.z);});
+ const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.BufferAttribute(new Float32Array(p),3));
+ scene.add(new THREE.LineSegments(g,new THREE.LineBasicMaterial({color:0x3a5a6a,transparent:true,opacity:0.05,blending:THREE.AdditiveBlending,depthWrite:false})));}
+// authored（配線）は直線・analogous（金の橋）は上へ弧。個別 Line 化してホバーで incident を光らせる
+const edgeObjs=[]; const edgeByNode={}; nodes.forEach(n=>edgeByNode[n.id]=[]);
+function addEdgeLine(e,color,baseOp,arc){const a=pos[e.from],b=pos[e.to];if(!a||!b)return;
+  let g; if(arc){const mid=a.clone().add(b).multiplyScalar(0.5);mid.z+=24+a.distanceTo(b)*0.18;
+    g=new THREE.BufferGeometry().setFromPoints(new THREE.QuadraticBezierCurve3(a,mid,b).getPoints(26));}
+  else g=new THREE.BufferGeometry().setFromPoints([a,b]);
+  const mat=new THREE.LineBasicMaterial({color,transparent:true,opacity:baseOp,blending:THREE.AdditiveBlending,depthWrite:false});
+  scene.add(new THREE.Line(g,mat));
+  const rec={from:e.from,to:e.to,mat,baseOp,arc}; edgeObjs.push(rec); edgeByNode[e.from].push(rec); edgeByNode[e.to].push(rec);}
+authEdges.forEach(e=>addEdgeLine(e,AUTH[e.type],0.42,false));
+anaEdges.forEach(e=>addEdgeLine(e,GOLD,0.30,true));
 
 /* ---- 星（種別グリフ・被参照で輝度/大きさ） ---- */
 const TYPE={discovery:{tex:TEX.warm,color:0xffe6b0,label:"発見"},question:{tex:TEX.cyan,color:0xbfeee6,label:"問い"},
@@ -150,10 +153,13 @@ addEventListener("pointermove",e=>{ndc.set(e.clientX/innerWidth*2-1,-(e.clientY/
     if(Math.abs(e.clientX-dx0)+Math.abs(e.clientY-dy0)>6)moved=true;
     if(moved){tYaw=clamp(tYaw-dx*0.002,YMAX);tPitch=clamp(tPitch+dy*0.002,PMAX);}}});
 const spriteObjs=stars.map(s=>s.s);
+let hlEdges=[];
+function highlightEdges(id){hlEdges.forEach(r=>r.mat.opacity=r.baseOp);hlEdges=id?(edgeByNode[id]||[]):[];
+  hlEdges.forEach(r=>r.mat.opacity=Math.min(1,r.baseOp*2.4+0.4));}
 function pick(){ray.setFromCamera(ndc,camera);const hit=ray.intersectObjects(spriteObjs,false);
-  const found=hit.length?stars.find(s=>s.s===hit[0].object):null;const fn=found?found.n:null;
-  if(fn!==hoverNode){hoverNode=fn;canvas.style.cursor=fn?"help":"default";
-    if(fn){tipQ.textContent=fn.summary;tipK.textContent=(TYPE[fn.type]||TYPE.note).label+" · "+(fn.bucket||"");tip.classList.add("show");firePulses(fn.id);}
+  const found=hit.length?stars.find(s=>s.s===hit[0].object):null;const fid=found?found.n.id:null;
+  if(fid!==hoverNode){hoverNode=fid;canvas.style.cursor=fid?"help":"default";highlightEdges(fid);
+    if(found){const n=found.n;tipQ.textContent=n.summary;tipK.textContent=(TYPE[n.type]||TYPE.note).label+" · "+(n.bucket||"");tip.classList.add("show");firePulses(fid);}
     else tip.classList.remove("show");}}
 
 /* ---- 光のパルス（配線を伝う） ---- */
