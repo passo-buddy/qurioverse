@@ -142,6 +142,16 @@
     #sky-questions .sq-head { font-size: 9px; letter-spacing: 0.3em; color: var(--muted); text-transform: uppercase; margin: 0 0 14px; }
   }
 
+  /* 今日の彗星の中へ「入っていく」遷移: 彗星の位置から寒色の光が湧き上がり画面を呑む → comet/ へ */
+  #warp {
+    position: fixed; inset: 0; z-index: 20; pointer-events: none; opacity: 0;
+    background: radial-gradient(circle at var(--wx, 50%) var(--wy, 50%),
+      rgba(111, 214, 208, 0.95) 0%, rgba(111, 214, 208, 0.5) 7%, rgba(223, 242, 255, 0.28) 16%, rgba(6, 10, 12, 0) 34%);
+    transform: scale(0.25); transform-origin: var(--wx, 50%) var(--wy, 50%);
+    transition: transform 0.95s cubic-bezier(0.5, 0, 0.75, 0), opacity 0.95s ease;
+  }
+  #warp.go { opacity: 1; transform: scale(7); }
+
   @media (max-width: 720px) {
     .helm { gap: 26px; }
     .masthead h1 { font-size: 19px; }
@@ -157,6 +167,7 @@
 
 <canvas id="scene" aria-hidden="true"></canvas>
 <div id="vig" aria-hidden="true"></div>
+<div id="warp" aria-hidden="true"></div>
 
 <header class="masthead">
   <h1>Qurioverse</h1>
@@ -490,10 +501,11 @@ function updateLabels() {
 }
 
 /* ---- 見渡し（ドラッグ/矢印キー）+ ホバー ---- */
-const mouse = { x: 0, y: 0 }, ndc = new THREE.Vector2(-2, -2);
+const mouse = { x: 0, y: 0, px: -9999, py: -9999 }, ndc = new THREE.Vector2(-2, -2);
 let dragging = false, dragMoved = false, lastX = 0, lastY = 0, downX = 0, downY = 0;
 const DRAG_SENS = 0.0022;
 addEventListener("pointerdown", (e) => {   // リンク（銀河ラベル/航法）上以外はどこを掴んでも見渡せる（空隙の上も可）
+  mouse.px = e.clientX; mouse.py = e.clientY;   // タップでも流れ星を掴めるよう座標を更新
   if (e.target.closest && e.target.closest("a")) return;
   dragging = true; dragMoved = false; lastX = downX = e.clientX; lastY = downY = e.clientY;
 });
@@ -501,6 +513,7 @@ addEventListener("pointerup", () => { dragging = false; });
 addEventListener("pointermove", (e) => {
   mouse.x = (e.clientX / innerWidth - 0.5) * 2;
   mouse.y = (e.clientY / innerHeight - 0.5) * 2;
+  mouse.px = e.clientX; mouse.py = e.clientY;   // スクリーン座標（流れ星ピック/掴みアフォーダンス用）
   ndc.set(mouse.x, -mouse.y);
   if (dragging && !REDUCED) {
     const dx = e.clientX - lastX, dy = e.clientY - lastY;
@@ -534,7 +547,31 @@ function pickGalaxy() {
     labels.forEach((l, i) => i < 3 && l.el.classList.toggle("hot", GX[i] === hover));
   }
 }
-canvas.addEventListener("click", () => { if (dragMoved) return; if (hover) location.href = hover.href; });
+// 流れ星の掴みは中心の空隙(#void)や銀河ラベル(<a>)など上層要素にクリックを奪われないよう、window の capture 段で最優先に判定（迷子防止）
+addEventListener("click", (e) => {
+  if (dragMoved) return;
+  if (questSys && questSys.tryCatch()) { e.stopPropagation(); e.preventDefault(); }  // 掴んだらこのクリックを消費（再センタ/遷移/ピンを抑止）
+}, true);
+canvas.addEventListener("click", () => {
+  if (dragMoved) return;
+  if (questSys && questSys.hovered()) { enterComet(); return; }          // 今日の彗星の中へ入っていく
+  if (hover) location.href = hover.href;                                 // 銀河へ
+});
+
+// 彗星核へ吸い込まれる遷移 → 内部ページ comet/?q=<今日の問い>（訪問者の声の群れ）
+let warping = false;
+function enterComet() {
+  if (warping || !questSys) return;
+  const id = questSys.cometId();
+  const dest = "comet/" + (id ? "?q=" + encodeURIComponent(id) : "");
+  if (REDUCED) { location.href = dest; return; }                        // 静止した宇宙は演出なしで即遷移
+  warping = true;
+  const s = questSys.cometScreen(), warp = document.getElementById("warp");
+  warp.style.setProperty("--wx", s.x + "px");
+  warp.style.setProperty("--wy", s.y + "px");
+  requestAnimationFrame(() => warp.classList.add("go"));                // 彗星の位置から寒色の光が湧き画面を呑む（~0.95s）
+  setTimeout(() => { location.href = dest; }, 900);
+}
 vEl.addEventListener("click", () => { if (dragMoved) return; vEl.classList.toggle("open"); targetYaw = 0; targetPitch = 0; }); // 空隙クリック=家に戻る（再センタリング。ドラッグは除外）
 
 /* ---- 主ループ（すべて遅い） ---- */
@@ -649,6 +686,7 @@ function buildQuestions(all) {
   const cLabel = document.getElementById("comet-label");
   if (comet) { cLabel.querySelector(".q").textContent = comet.text; cLabel.querySelector(".tag").textContent = "今日の彗星 · 自分の問い"; }
   let cometPinned = false;
+  let cometPx = innerWidth / 2, cometPy = innerHeight / 2;   // 彗星頭部のスクリーン座標（内部へ入る遷移の湧き出し点）
   const rayC = new THREE.Raycaster();
   const headPos = new THREE.Vector3();
   const projV = new THREE.Vector3();
@@ -668,29 +706,54 @@ function buildQuestions(all) {
     const tail = [];
     for (let i = 0; i < 6; i++) { const s = sprite(TEX.milk, 0xcfeee6, 3.0 * (1 - i / 6), 0); tail.push(s); scene.add(s); }
     scene.add(head);
+    const ageStr = q.age ? ` · ${q.age}歳のころ` : "";
     const cap = document.createElement("div");
     cap.className = "meteor-cap";
-    cap.innerHTML = `<p class="q">${q.text}</p><span class="tag">流れ星${q.age ? ` · ${q.age}歳のころ` : ""}</span>`;
+    cap.innerHTML = `<p class="q">${q.text}</p><span class="tag">流れ星${ageStr}</span>`;
     document.body.appendChild(cap);
     const dir = new THREE.Vector3(mr() - 0.5, -(0.35 + mr() * 0.5), mr() - 0.5).normalize();
+    // 掴んだ問いの縁で灯る「理解」の暈（金・淡）。核は乳白のまま — 空隙の rim+halo と同語彙。掴むまで opacity 0 で待機（生成は1回のみ）
+    const rim = sprite(TEX.warm, GOLD, 9.5, 0);
+    const halo = sprite(TEX.warm, GOLD, 21, 0);
+    scene.add(rim); scene.add(halo);
     return {
-      q, head, tail, cap, dir,
+      q, head, tail, cap, dir, rim, halo, ageStr,
       interval: 46 + mr() * 40,   // 46-86s に一度
       offset: mr() * 80,
       life: 2.4,                   // 尾を引いて流れる時間（長いほどゆっくり）
       len: 58 + mr() * 26,
       radiant: radiantFor(q),
+      caught: false, lit: 0, caughtT: 0, phc: 0, caughtOpa: 0, caughtPos: new THREE.Vector3(),
+      sx: -9999, sy: -9999, catchable: false,   // スクリーン座標 + 掴めるか（毎フレーム update が更新）
     };
   });
-  const mHead = new THREE.Vector3(), mProj = new THREE.Vector3();
+  const mHead = new THREE.Vector3(), mProj = new THREE.Vector3(), mTmp = new THREE.Vector3();
+  const CATCH_R = matchMedia("(pointer: coarse)").matches ? 46 : 34;   // 掴み判定の許容半径（px・タッチはやや寛容）
+  const CATCH_R2 = CATCH_R * CATCH_R;
+  let lastT = 0, prevT = 0;
+  // ポインタ直下の掴める流れ星（スクリーン座標で最近傍・active or 掴み中のみ）
+  function nearestCatchable(px, py) {
+    if (px < -9000) return null;
+    let best = null, bd = CATCH_R2;
+    for (const m of meteorObjs) {
+      if (!m.catchable) continue;
+      const dx = m.sx - px, dy = m.sy - py, d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; best = m; }
+    }
+    return best;
+  }
 
   return {
     update(t) {
+      lastT = t;   // クリック時（tryCatch）に最新の t を使う
+      const dt = prevT ? Math.min(0.05, t - prevT) : 0.0167; prevT = t;   // フレーム間隔（リフレッシュレート非依存の平滑用・タブ復帰の大ジャンプは 50ms に丸め）
       // 彗星
       if (comet) {
         const w = cometWorld(t);
         cometHead.position.copy(w);
         cometHit.position.copy(w);
+        projV.copy(w).project(camera);   // 彗星頭部のスクリーン座標を毎フレーム保持（内部へ入る遷移の起点）
+        cometPx = (projV.x * 0.5 + 0.5) * innerWidth; cometPy = (-projV.y * 0.5 + 0.5) * innerHeight;
         history.unshift(w.clone());
         if (history.length > TAIL_N + 2) history.pop();
         for (let i = 0; i < TAIL_N; i++) { const h = history[Math.min(i + 1, history.length - 1)]; if (h) cometTail[i].position.copy(h); }
@@ -700,7 +763,6 @@ function buildQuestions(all) {
         const shown = hit || cometPinned;
         cLabel.classList.toggle("show", shown);
         cLabel.setAttribute("aria-hidden", shown ? "false" : "true");
-        if (hit) canvas.style.cursor = "help";
         if (shown) {
           projV.copy(w); projV.y += 8; projV.project(camera);
           cLabel.style.left = ((projV.x * 0.5 + 0.5) * innerWidth) + "px";
@@ -708,44 +770,88 @@ function buildQuestions(all) {
         }
         cometSysHit = hit; // クリック判定用に共有
       }
-      // 流れ星
+      // 流れ星（クリックで掴む＝その場で止まり光を放つ / 再クリックで放つ＝再び流れる。すべて遅い）
       meteorObjs.forEach((m) => {
-        const ph = ((t + m.offset) % m.interval) / m.life; // >1 なら休止中
-        const active = ph <= 1;
-        let opa = 0;
-        if (active) {
-          opa = Math.sin(ph * Math.PI); // 立ち上がり→消え
-          mHead.copy(m.radiant).addScaledVector(m.dir, ph * m.len);
-          m.head.position.copy(mHead);
-          m.head.material.opacity = opa;
-          for (let i = 0; i < m.tail.length; i++) {
-            const back = (i + 1) * 0.9;
-            m.tail[i].position.copy(m.radiant).addScaledVector(m.dir, Math.max(0, ph * m.len - back));
-            m.tail[i].material.opacity = opa * (1 - i / m.tail.length) * 0.7;
-          }
-          mProj.copy(mHead); mProj.project(camera);
-          const vis = mProj.z < 1;
-          m.cap.style.opacity = vis ? (opa * 0.95).toFixed(3) : 0;
-          if (vis) {
-            m.cap.style.left = ((mProj.x * 0.5 + 0.5) * innerWidth) + "px";
-            m.cap.style.top = ((-mProj.y * 0.5 + 0.5) * innerHeight - 26) + "px";
-          }
-        } else {
-          m.head.material.opacity = 0; m.tail.forEach((s) => s.material.opacity = 0); m.cap.style.opacity = 0;
+        const ph = ((t + m.offset) % m.interval) / m.life;   // >1 なら休止中
+        const phB = m.caught ? m.phc : Math.min(ph, 1);        // 掴んだら位相を凍結
+        const opaB = m.caught ? m.caughtOpa : Math.sin(Math.min(ph, 1) * Math.PI); // 流れの明滅（掴んだ瞬間の値で固定）
+        m.lit += ((m.caught ? 1 : 0) - m.lit) * (1 - Math.exp(-dt / 0.5));   // 灯り度: 時定数 ~0.5s の指数平滑で点り/戻る（dt 基準＝どの端末でも同じ遅さ）
+        const lit = m.lit;
+        if (!m.caught && opaB <= 0.001 && lit < 0.002) {       // 休止中＝不可視・掴めない
+          m.head.material.opacity = 0; m.tail.forEach((s) => s.material.opacity = 0);
+          m.rim.material.opacity = 0; m.halo.material.opacity = 0; m.cap.style.opacity = 0;
+          m.catchable = false; return;
         }
+        // 頭部の世界座標: 掴んだら固定点、そうでなければ軌道上（放した瞬間 phB=phc→固定点と一致＝テレポートしない）
+        if (m.caught) m.head.position.copy(m.caughtPos);
+        else { mHead.copy(m.radiant).addScaledVector(m.dir, phB * m.len); m.head.position.copy(mHead); }
+        const hp = m.head.position;
+        const breathe = 0.9 + 0.1 * Math.sin((t / 7) * Math.PI * 2);   // 宇宙本体と同じ 7s の呼吸
+        const litOpa = 0.9 * breathe;   // 灯った定常の明るさ（暈と合算で流れの明滅より確実に増光＝放つ）
+        const swell = m.caught ? 1 + 0.12 * Math.exp(-Math.pow((t - m.caughtT - 0.8) / 0.5, 2)) : 1; // 掴んだ一息の「放つ」膨らみ（単発・~0.8s ピーク・遅い）
+        // 頭部: 流れの明滅 → 灯りへクロスフェード（掴んだ瞬間の値から連続・急変なし）
+        m.head.material.opacity = (opaB * (1 - lit) + litOpa * lit) * swell;
+        const hs = 3.6 + 0.5 * lit; m.head.scale.set(hs, hs, 1);
+        // 尾: 流れる時は後方へ連なり、掴むと頭部へ畳まれて消える（＝点の星に凝る・発光源になる）
+        for (let i = 0; i < m.tail.length; i++) {
+          const back = (i + 1) * 0.9;
+          mTmp.copy(m.radiant).addScaledVector(m.dir, Math.max(0, phB * m.len - back));
+          m.tail[i].position.copy(mTmp).lerp(hp, lit);
+          m.tail[i].material.opacity = opaB * (1 - i / m.tail.length) * 0.7 * (1 - lit);
+        }
+        // 金の暈: 掴むと縁に理解が灯る（核は乳白のまま・暈だけ淡い金＝空隙の rim+halo と同語彙）
+        m.rim.position.copy(hp); m.halo.position.copy(hp);
+        m.rim.material.opacity = 0.12 * lit * breathe;
+        m.halo.material.opacity = 0.05 * lit * breathe;
+        // キャプション: 流れる間は明滅、掴んだら読めるよう出し続ける
+        mProj.copy(hp); mProj.project(camera);
+        const vis = mProj.z < 1;
+        m.sx = (mProj.x * 0.5 + 0.5) * innerWidth; m.sy = (-mProj.y * 0.5 + 0.5) * innerHeight;
+        const capOpa = vis ? Math.max(opaB * 0.95 * (1 - lit), lit * 0.96) : 0;
+        m.cap.style.opacity = capOpa.toFixed(3);
+        m.cap.setAttribute("aria-hidden", capOpa > 0.02 ? "false" : "true");
+        if (vis) {
+          const cx = Math.max(70, Math.min(innerWidth - 70, m.sx));           // 端で画面外へあふれない
+          const cy = Math.max(64, Math.min(innerHeight - 72, m.sy - 26));     // masthead / helm に被らない安全域
+          m.cap.style.left = cx + "px";
+          m.cap.style.top = cy + "px";
+        }
+        m.catchable = vis && (m.caught || opaB > 0.15);   // 掴める＝いま見えている流れ星 or 掴んで灯る星（幻の当たりを作らない）
       });
+      // カーソルを毎フレーム一元決定（sticky を作らない）: 流れ星 grab > 彗星 help > 銀河 pointer > default
+      const mh = nearestCatchable(mouse.px, mouse.py);
+      canvas.style.cursor = mh ? "grab" : cometSysHit ? "help" : hover ? "pointer" : "default";
+      vEl.style.cursor = mh ? "grab" : "";   // 中心の空隙(#void)が掴みカーソルを奪わないよう同期
     },
     togglePin() { cometPinned = !cometPinned; return cometPinned; },
     hovered() { return cometSysHit; },
+    cometId() { return comet ? comet.id : null; },              // 今日の彗星（＝その日の問い）の ID
+    cometScreen() { return { x: cometPx, y: cometPy }; },        // 内部へ入る遷移の湧き出し点
+    // ポインタ直下の流れ星を掴む/放す。掴んだ星があれば true（＝クリックを消費して銀河遷移を防ぐ）
+    tryCatch() {
+      const m = nearestCatchable(mouse.px, mouse.py);
+      if (!m) return false;
+      if (!m.caught) {
+        const ph = ((lastT + m.offset) % m.interval) / m.life;
+        m.phc = Math.min(ph, 1);
+        m.caughtOpa = Math.sin(m.phc * Math.PI);
+        m.caughtT = lastT;
+        m.caughtPos.copy(m.head.position);
+        m.caught = true;
+        m.cap.querySelector(".tag").textContent = "つかまえた問い" + m.ageStr;
+      } else {
+        // 放す: 掴んだ位相から自然に流れを再開（頭部が飛ばない＝テレポート防止）
+        m.offset = (((m.phc * m.life) - lastT) % m.interval + m.interval) % m.interval;
+        m.caught = false;
+        m.cap.querySelector(".tag").textContent = "流れ星" + m.ageStr;
+      }
+      return true;
+    },
   };
 }
 
 let cometSysHit = false; // 彗星ホバー状態（クリックでピン留め用・update が毎フレーム更新）
-// 彗星のタップ/クリックで本文をピン留め（タッチでも読める）
-canvas.addEventListener("click", () => {
-  if (dragMoved) return;
-  if (questSys && questSys.hovered()) questSys.togglePin();
-});
+// 流れ星の掴み・彗星のピン留め・銀河遷移の優先順位は上の canvas click ハンドラに集約（迷子防止）
 
 fetch("questions.json", { cache: "no-cache" })
   .then((r) => (r.ok ? r.json() : Promise.reject(new Error("questions.json " + r.status))))
