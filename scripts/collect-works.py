@@ -2,6 +2,7 @@
 """作品の星団 works.json 生成（決定論・0円）。
    YouTube = 公式RSS（実データ・直近~15本・タイトル/リンク/日付/再生数/サムネ）
    Instagram = 手動（galaxies/sakuhin/works.instagram.json を編集）
+   アプリ = 手動（galaxies/sakuhin/works.apps.json を編集）
    使い方: python3 scripts/collect-works.py  → galaxies/sakuhin/works.json を再生成し commit。
    RSS は直近~15本のみ返す（公式仕様）。ネット不通時は既存 works.json の YT を保持（fail-open）。
    ※ predeploy には入れない（外部fetch＝非hermetic）。YT を最新化したい時に手動実行→commit。"""
@@ -58,6 +59,11 @@ def load_json(path):
     return json.load(open(path, encoding="utf-8")) if os.path.exists(path) else None
 
 def main():
+    apps = load_json(os.path.join(SAKUHIN, "works.apps.json"))
+    if apps:
+        apps.setdefault("source", "manual")
+        apps.pop("_note", None)
+
     ig = load_json(os.path.join(SAKUHIN, "works.instagram.json"))
     if ig:
         ig.setdefault("source", "manual")
@@ -77,11 +83,11 @@ def main():
             if c.get("platform") == "youtube":
                 yt = c
 
-    clusters = [c for c in (ig, yt) if c and c.get("works")]
+    clusters = [c for c in (apps, ig, yt) if c and c.get("works")]
     if not clusters:
         print("ERROR: no clusters with works — aborting (既存 works.json は保持)"); sys.exit(1)
     out = {
-        "_note": "自動生成（scripts/collect-works.py）。YouTube=公式RSS（実データ・直近~15本）/ Instagram=手動（works.instagram.json を編集）。",
+        "_note": "自動生成（scripts/collect-works.py）。YouTube=公式RSS（実データ・直近~15本）/ Instagram=手動（works.instagram.json を編集）/ アプリ=手動（works.apps.json を編集）。",
         "clusters": clusters,
     }
     with open(os.path.join(SAKUHIN, "works.json"), "w", encoding="utf-8") as f:

@@ -42,9 +42,9 @@
 <canvas id="scene" aria-hidden="true"></canvas>
 <header class="hud">
   <h1>作品の星団</h1>
-  <div class="sub">Works · Instagram × YouTube</div>
+  <div class="sub">Works · Apps × Instagram × YouTube</div>
   <div class="stat" id="stat"></div>
-  <div class="cap">星=作品 二つの群れ=媒体（Instagram／YouTube） 輝度=反応 ホバーで作品・クリックで開く</div>
+  <div class="cap">星=作品 群れ=媒体（アプリ／Instagram／YouTube） 輝度=反応 ホバーで作品・クリックで開く</div>
   <div class="cap" id="src-note" style="opacity:.6"></div>
   <div class="legend" id="legend"></div>
 </header>
@@ -103,18 +103,20 @@ const stars=[];        // {work, platform, name, metric, s, halo, base, tw, ph}
 const clabels=[];      // {el, c}
 let hoverStar=null;
 
-/* ---- 二重星団を組む（線なし＝星座と構造的に違う。重力で束ねた"群れ"） ---- */
+/* ---- 星団を組む（線なし＝星座と構造的に違う。重力で束ねた"群れ"） ---- */
 function build(data){
   const clusters=data.clusters||[];
-  const CX=46;                                   // 星団の中心間の半分（隣り合う二群）
+  const GAP=(clusters.length>2)?66:92;           // 星団の中心間距離（3群以上は詰めて全体をカメラに収める）
   let total=0; const legendHtml=[];
   clusters.forEach((cl,ci)=>{
     const works=cl.works||[]; if(!works.length) return;
-    const cx=(clusters.length===1)?0:(ci===0?-CX:CX);
+    const cx=(ci-(clusters.length-1)/2)*GAP;
     const center=new THREE.Vector3(cx,0,0);
     const tex=glowTex(cl.hue||"236,227,208");
     const color=new THREE.Color(`rgb(${cl.hue||"236,227,208"})`);
-    const maxEng=Math.max(1,...works.map(w=>w.engagement||0));
+    const engs=works.map(w=>w.engagement||0);
+    const maxEng=Math.max(1,...engs);
+    const hasEng=engs.some(v=>v>0);              // 反応データを持たない群れ（アプリ等）は全星を同輝度で
     // 束縛のグロー（この群れが"ひとつ"であることを示す淡い星雲）＋ 密な核
     const neb=sprite(tex,color,58,0.10); neb.position.copy(center); neb.renderOrder=0; scene.add(neb);
     const core=sprite(WARM,new THREE.Color(GOLD),7,0.5); core.position.copy(center); core.renderOrder=1; scene.add(core);
@@ -124,7 +126,7 @@ function build(data){
       const th=rnd()*6.283, phi=Math.acos(2*rnd()-1), r=24*(0.16+0.84*Math.sqrt(rnd()));
       const off=new THREE.Vector3(r*Math.sin(phi)*Math.cos(th), r*Math.sin(phi)*Math.sin(th)*0.82, r*Math.cos(phi)*0.7);
       const p=center.clone().add(off);
-      const b=Math.log1p(w.engagement||0)/Math.log1p(maxEng);   // 反応→輝度（クラスタ内で正規化＝尺度差を吸収）
+      const b=hasEng?Math.log1p(w.engagement||0)/Math.log1p(maxEng):0.75;   // 反応→輝度（クラスタ内で正規化＝尺度差を吸収）
       const sz=3.2+b*6, op=0.5+b*0.42;
       const s=sprite(tex,color,sz,op); s.position.copy(p); s.renderOrder=2; scene.add(s);
       const halo=sprite(tex,color,sz*2.0,0.07+b*0.08); halo.position.copy(p); halo.renderOrder=1; scene.add(halo);
@@ -160,7 +162,7 @@ function pick(){ray.setFromCamera(ndc,camera);const objs=stars.map(s=>s.s);const
   const found=hit.length?stars.find(s=>s.s===hit[0].object):null;
   if(found!==hoverStar){hoverStar=found;canvas.style.cursor=found?"pointer":"default";
     if(found){tipQ.textContent=found.work.title||"（無題）";
-      tipK.textContent=found.platform+" · "+metricLabel(found.metric)+(found.work.engagement??"")+" · クリックで開く";
+      tipK.textContent=found.platform+((found.work.engagement!=null)?(" · "+metricLabel(found.metric)+found.work.engagement):"")+" · クリックで開く";
       tip.classList.add("show");}
     else tip.classList.remove("show");}}
 

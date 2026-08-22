@@ -1,0 +1,18 @@
+{
+  "_note": "手動データ（作品の星団のアプリクラスタ）。各作品 = {title, url, date(YYYY-MM-DD 任意), engagement(任意・無ければ全星を同輝度で描画)}。編集後 python3 scripts/collect-works.py で works.json を再生成。",
+  "platform": "apps",
+  "name": "アプリ",
+  "hue": "141,190,232",
+  "metric": "app",
+  "source": "manual",
+  "works": [
+    {
+      "title": "TOINOVA（トイノヴァ）— 問いを星として灯す、静かな宇宙",
+      "url": "https://toinova.vercel.app"
+    },
+    {
+      "title": "TOIBAMI（トイバミ）— 子どもの問いを食べてキャラクターが育つ",
+      "url": "https://toibami.vercel.app"
+    }
+  ]
+}

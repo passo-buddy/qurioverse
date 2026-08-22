@@ -1,6 +1,23 @@
 {
-  "_note": "自動生成（scripts/collect-works.py）。YouTube=公式RSS（実データ・直近~15本）/ Instagram=手動（works.instagram.json を編集）。",
+  "_note": "自動生成（scripts/collect-works.py）。YouTube=公式RSS（実データ・直近~15本）/ Instagram=手動（works.instagram.json を編集）/ アプリ=手動（works.apps.json を編集）。",
   "clusters": [
+    {
+      "platform": "apps",
+      "name": "アプリ",
+      "hue": "141,190,232",
+      "metric": "app",
+      "source": "manual",
+      "works": [
+        {
+          "title": "TOINOVA（トイノヴァ）— 問いを星として灯す、静かな宇宙",
+          "url": "https://toinova.vercel.app"
+        },
+        {
+          "title": "TOIBAMI（トイバミ）— 子どもの問いを食べてキャラクターが育つ",
+          "url": "https://toibami.vercel.app"
+        }
+      ]
+    },
     {
       "platform": "instagram",
       "name": "Instagram",
@@ -136,7 +153,7 @@
           "title": "【注意力テスト】今日の1問～No.4～",
           "url": "https://www.youtube.com/watch?v=HAR2nzkM5EQ",
           "date": "2018-05-02",
-          "engagement": 52,
+          "engagement": 54,
           "thumb": "https://i.ytimg.com/vi/HAR2nzkM5EQ/hqdefault.jpg"
         },
         {
